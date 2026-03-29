@@ -1,66 +1,98 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  SafeAreaView, 
-  ScrollView, 
-  TouchableOpacity, 
-  FlatList, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  FlatList,
   Platform,
   StatusBar,
   ActivityIndicator,
   Dimensions
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Bell, TrendingUp, TrendingDown, Wallet, Zap, ChevronRight } from 'lucide-react-native';
+import { Bell, TrendingUp, TrendingDown, Wallet, Zap, ChevronRight, AlertTriangle } from 'lucide-react-native';
 import { COLORS, GRADIENTS, SPACING, BORDER_RADIUS, SHADOW } from '../../utils/theme';
 import socketService from '../../services/socket';
 import storage from '../../services/storage';
-import { transactionsApi } from '../../services/api';
+import { transactionsApi, authApi } from '../../services/api';
 
 const HomeScreen = ({ navigation }: any) => {
   const [userName, setUserName] = useState('User');
   const [summary, setSummary] = useState([
-    { id: 'income', label: 'Total Income', amount: '₹1,24,000', colors: GRADIENTS.income, icon: TrendingUp },
-    { id: 'expense', label: 'Total Expense', amount: '₹48,500', colors: GRADIENTS.expense, icon: TrendingDown },
-    { id: 'balance', label: 'Net Balance', amount: '₹75,500', colors: GRADIENTS.indigo, icon: Wallet },
+    { id: 'income', label: 'Monthly Income', amount: '₹0', colors: GRADIENTS.income, icon: TrendingUp },
+    { id: 'expense', label: 'Total Expense', amount: '₹0', colors: GRADIENTS.expense, icon: TrendingDown },
+    { id: 'balance', label: 'Net Balance', amount: '₹0', colors: GRADIENTS.indigo, icon: Wallet },
   ]);
   const [insightData, setInsightData] = useState<any>(null);
 
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [showSalaryPrompt, setShowSalaryPrompt] = useState(false);
+  const [monthlyIncome, setMonthlyIncome] = useState(0);
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (forceRefresh = false) => {
       try {
         setLoading(true);
-        const profile = await storage.getUserProfile();
-        if (profile) {
-           setUserName(profile.name || 'User');
+        let incomeFromApi = 0;
+
+        // Get fresh user data from /me API (uses token automatically)
+        try {
+          const me = await authApi.getMe();
+          console.log(me, "me data")
+
+          incomeFromApi = me.monthly_income || 0;
+          setMonthlyIncome(incomeFromApi);
+          setUserName(me.phone || 'User');
+
+          // Sync profile locally
+          const existing = await storage.getUserProfile() || {};
+          await storage.setUserProfile({
+            ...existing,
+            id: me.id,
+            phone: me.phone,
+            monthly_income: me.monthly_income,
+          });
+
+          if (me.monthly_income === 0 || !me.monthly_income) {
+            setShowSalaryPrompt(true);
+          } else {
+            setShowSalaryPrompt(false);
+          }
+        } catch (e) {
+          // Fallback to cached profile
+          const cached = await storage.getUserProfile();
+          console.log(cached, "cached")
+          const incomeFromCache = cached?.monthly_income || 0;
+          console.log(incomeFromCache)
+          setMonthlyIncome(incomeFromCache);
+
+          if (incomeFromCache === 0) setShowSalaryPrompt(true);
         }
-        
-        const insightDataResponse = await transactionsApi.getInsights();
+
+        // Fetch insights (token-based, no userId needed)
+        const insightDataResponse = await transactionsApi.getInsights(forceRefresh);
+        console.log(insightDataResponse, "insightDataResponse")
         if (insightDataResponse) {
           setInsightData(insightDataResponse);
           const totalSpend = insightDataResponse.total_spend || 0;
-          const income = insightDataResponse.total_income || 124000;
-          
-          setSummary([
-            { id: 'income', label: 'Total Income', amount: `₹${income.toLocaleString()}`, colors: GRADIENTS.income, icon: TrendingUp },
-            { id: 'expense', label: 'Total Expense', amount: `₹${totalSpend.toLocaleString()}`, colors: GRADIENTS.expense, icon: TrendingDown },
-            { id: 'balance', label: 'Net Balance', amount: `₹${(income - totalSpend).toLocaleString()}`, colors: GRADIENTS.indigo, icon: Wallet },
-          ]);
+          const income =
+            incomeFromApi || insightDataResponse.total_income || 0; setSummary([
+              { id: 'income', label: 'Monthly Income', amount: `₹${income.toLocaleString()}`, colors: GRADIENTS.income, icon: TrendingUp },
+              { id: 'expense', label: 'Total Expense', amount: `₹${totalSpend.toLocaleString()}`, colors: GRADIENTS.expense, icon: TrendingDown },
+              { id: 'balance', label: 'Net Balance', amount: `₹${(income - totalSpend).toLocaleString()}`, colors: GRADIENTS.indigo, icon: Wallet },
+            ]);
 
-          // Transform breakdown to transactions list for visualization
           if (insightDataResponse.breakdown) {
             const transformed = insightDataResponse.breakdown.map((item: any, idx: number) => ({
-                id: `bk-${idx}`,
-                merchant: item.category.charAt(0).toUpperCase() + item.category.slice(1),
-                amount: `-₹${item.amount.toLocaleString()}`,
-                time: 'Total this month',
-                type: 'debit',
-                category: item.category
+              id: `bk-${idx}`,
+              merchant: item.category.charAt(0).toUpperCase() + item.category.slice(1),
+              amount: `-₹${item.amount.toLocaleString()}`,
+              time: 'Total this month',
+              type: 'debit',
+              category: item.category
             }));
             setTransactions(transformed);
           } else {
@@ -73,16 +105,43 @@ const HomeScreen = ({ navigation }: any) => {
         setLoading(false);
       }
     };
-    
-    fetchData();
 
-    // Setup Socket connection
-    socketService.connect();
-    socketService.on('new_transaction', (newTx: any) => {
-      setTransactions(prev => [newTx, ...prev.slice(0, 9)]);
-    });
+    const setupApp = async () => {
+      fetchData(false);
+
+      const profile = await storage.getUserProfile();
+      const userId = profile?.id;
+
+      if (userId) {
+        socketService.connect(userId);
+
+        // 👇 VERY IMPORTANT: wait for connection
+        socketService.on('connect', () => {
+          console.log('✅ SOCKET CONNECTED');
+
+          // 👇 JOIN ROOM AFTER CONNECT
+          socketService.emit('join', userId);
+
+          // 👇 attach listener AFTER connect
+          socketService.off('new_transaction');
+          socketService.on('new_transaction', (data) => {
+            console.log('🔥 EVENT RECEIVED:', data);
+            fetchData(true);
+          });
+        });
+      }
+    };
+
+    setupApp();
+
+    const handleNewTransaction = () => {
+      fetchData(true);
+    };
+
+    socketService.on('new_transaction', handleNewTransaction);
 
     return () => {
+      socketService.off('new_transaction', handleNewTransaction);
       socketService.disconnect();
     };
   }, []);
@@ -102,7 +161,7 @@ const HomeScreen = ({ navigation }: any) => {
     );
   };
 
-  const renderTransaction = ( {item}: any ) => (
+  const renderTransaction = ({ item }: any) => (
     <TouchableOpacity style={styles.transactionItem} activeOpacity={0.7}>
       <View style={[styles.transactionIcon, { backgroundColor: item.type === 'credit' ? COLORS.incomeLight : COLORS.expenseLight }]}>
         {item.type === 'credit' ? <TrendingUp size={20} color={COLORS.income} /> : <TrendingDown size={20} color={COLORS.expense} />}
@@ -129,7 +188,27 @@ const HomeScreen = ({ navigation }: any) => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        
+
+        {/* Salary Prompt */}
+        {showSalaryPrompt && (
+          <TouchableOpacity
+            style={styles.promptContainer}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <LinearGradient colors={['#FFF7ED', '#FFEDD5']} style={styles.promptContent}>
+              <View style={styles.promptIcon}>
+                <AlertTriangle size={24} color="#C2410C" />
+              </View>
+              <View style={styles.promptTextContainer}>
+                <Text style={styles.promptTitle}>Finish Setup</Text>
+                <Text style={styles.promptDescription}>Set your salary in the Profile section to get AI insights.</Text>
+              </View>
+              <ChevronRight size={20} color="#C2410C" />
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
         {/* Header */}
         <View style={styles.header}>
           <View>
@@ -155,8 +234,8 @@ const HomeScreen = ({ navigation }: any) => {
         />
 
         {/* AI Insight Card */}
-        <TouchableOpacity 
-          style={styles.insightCard} 
+        <TouchableOpacity
+          style={styles.insightCard}
           activeOpacity={0.9}
           onPress={() => navigation.navigate('Insights')}
         >
@@ -183,9 +262,9 @@ const HomeScreen = ({ navigation }: any) => {
         </View>
         <View style={styles.transactionsContainer}>
           {transactions.map(item => (
-             <React.Fragment key={item.id}>
-               {renderTransaction({item})}
-             </React.Fragment>
+            <React.Fragment key={item.id}>
+              {renderTransaction({ item })}
+            </React.Fragment>
           ))}
         </View>
 
@@ -194,8 +273,8 @@ const HomeScreen = ({ navigation }: any) => {
           <Text style={styles.sectionTitle}>Alerts</Text>
         </View>
         <View style={styles.alertCard}>
-            <View style={styles.alertIndicator} />
-            <Text style={styles.alertText}>Low balance warning: Bank account ending in 4231 is below ₹5,000</Text>
+          <View style={styles.alertIndicator} />
+          <Text style={styles.alertText}>Low balance warning: Bank account ending in 4231 is below ₹5,000</Text>
         </View>
 
       </ScrollView>
@@ -399,6 +478,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.background,
+  },
+  promptContainer: {
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    overflow: 'hidden',
+    ...SHADOW,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  promptContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+  },
+  promptIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFEDD5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.md,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  promptTextContainer: {
+    flex: 1,
+  },
+  promptTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#9A3412',
+  },
+  promptDescription: {
+    fontSize: 12,
+    color: '#C2410C',
+    marginTop: 2,
   },
 });
 

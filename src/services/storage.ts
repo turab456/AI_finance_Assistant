@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const STORAGE_KEYS = {
   ONBOARDING_COMPLETED: 'onboarding_completed',
   USER_PROFILE: 'user_profile',
+  AUTH_TOKEN: 'auth_token',
 };
 
 export const storage = {
@@ -35,6 +36,7 @@ export const storage = {
   async getUserProfile() {
     try {
       const value = await AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+      console.log(value, "value")
       return value ? JSON.parse(value) : null;
     } catch (e) {
       console.error('Error getting user profile', e);
@@ -47,6 +49,31 @@ export const storage = {
       await AsyncStorage.clear();
     } catch (e) {
       console.error('Error clearing storage', e);
+    }
+  },
+
+  async setToken(token: string) {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+    } catch (e) {
+      console.error('Error saving token', e);
+    }
+  },
+
+  async getToken(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    } catch (e) {
+      console.error('Error getting token', e);
+      return null;
+    }
+  },
+
+  async clearToken() {
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    } catch (e) {
+      console.error('Error clearing token', e);
     }
   },
 };

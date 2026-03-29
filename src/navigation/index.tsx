@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, List, PieChart as PieChartIcon, Settings } from 'lucide-react-native';
+import { Home, List, PieChart as PieChartIcon, User as UserIcon } from 'lucide-react-native';
 
 // Screens
 import SplashScreen from '../screens/SplashScreen';
@@ -14,6 +14,8 @@ import CompletionStep from '../screens/onboarding/CompletionStep';
 import HomeScreen from '../screens/main/HomeScreen';
 import TransactionsScreen from '../screens/main/TransactionsScreen';
 import InsightsScreen from '../screens/main/InsightsScreen';
+import ProfileScreen from '../screens/main/ProfileScreen';
+import NotificationPermissionScreen from '../screens/NotificationPermissionScreen';
 
 import { COLORS } from '../utils/theme';
 
@@ -76,6 +78,13 @@ const MainTabNavigator = () => (
         tabBarIcon: ({ color, size }) => <PieChartIcon size={size} color={color} />,
       }}
     />
+    <Tab.Screen 
+      name="Profile" 
+      component={ProfileScreen} 
+      options={{
+        tabBarIcon: ({ color, size }) => <UserIcon size={size} color={color} />,
+      }}
+    />
   </Tab.Navigator>
 );
 
@@ -96,6 +105,7 @@ const AppNavigator = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
+        <Stack.Screen name="NotificationPermission" component={NotificationPermissionScreen} />
         <Stack.Screen name="Main" component={MainNavigator} />
       </Stack.Navigator>
     </NavigationContainer>

@@ -14,7 +14,20 @@ const CompletionStep = ({ navigation, route }: any) => {
     await storage.setUserProfile(userProfile);
     await storage.setOnboardingCompleted(true);
     
-    navigation.replace('Main');
+    import('react-native').then(({ NativeModules }) => {
+        const { NotificationPermissionModule } = NativeModules;
+        if (NotificationPermissionModule) {
+            NotificationPermissionModule.isNotificationServiceEnabled().then((isEnabled: boolean) => {
+                if (isEnabled) {
+                    navigation.replace('Main');
+                } else {
+                    navigation.replace('NotificationPermission');
+                }
+            });
+        } else {
+            navigation.replace('Main');
+        }
+    });
   };
 
   return (

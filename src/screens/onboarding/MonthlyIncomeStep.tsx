@@ -1,16 +1,22 @@
 import React, { useState, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  SafeAreaView, 
-  Animated, 
-  PanResponder, 
-  Dimensions 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  Animated,
+  PanResponder,
+  Dimensions,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  NativeModules
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOW } from '../../utils/theme';
+import { authApi } from '../../services/api';
+import storage from '../../services/storage';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SLIDER_WIDTH = SCREEN_WIDTH - SPACING.lg * 4;
@@ -19,7 +25,8 @@ const MAX_INCOME = 200000;
 const MonthlyIncomeStep = ({ navigation, route }: any) => {
   const { incomeType } = route?.params || {};
   const [income, setIncome] = useState(50000);
-  
+  const [loading, setLoading] = useState(false);
+
   const scrollX = useRef(new Animated.Value((50000 / MAX_INCOME) * SLIDER_WIDTH)).current;
   const lastScrollX = useRef((50000 / MAX_INCOME) * SLIDER_WIDTH);
 
@@ -30,7 +37,7 @@ const MonthlyIncomeStep = ({ navigation, route }: any) => {
         let newX = lastScrollX.current + gestureState.dx;
         if (newX < 0) newX = 0;
         if (newX > SLIDER_WIDTH) newX = SLIDER_WIDTH;
-        
+
         scrollX.setValue(newX);
         const calculatedIncome = Math.round((newX / SLIDER_WIDTH) * MAX_INCOME / 1000) * 1000;
         setIncome(calculatedIncome);
@@ -42,16 +49,73 @@ const MonthlyIncomeStep = ({ navigation, route }: any) => {
     })
   ).current;
 
-  const handleContinue = () => {
-    navigation.navigate('SpendingGoal', { 
-        incomeType, 
+  const handleContinue = async () => {
+    try {
+      setLoading(true);
+      const response = await authApi.createUser(null as any, income);
+      const user = response.user || response;
+
+      // Store user info
+      const profile = await storage.getUserProfile() || {};
+      await storage.setUserProfile({
+        ...profile,
+        id: user.id,
+        phone: user.phone || null,
+        monthly_income: income,
+        incomeType
+      });
+
+      // Sync to native SharedPreferences for NotificationService
+      const { NotificationPermissionModule } = NativeModules;
+      if (NotificationPermissionModule) {
+        NotificationPermissionModule.setUserId(user.id);
+        if (response.token) {
+          NotificationPermissionModule.setAuthToken(response.token);
+        }
+      }
+
+      navigation.navigate('SpendingGoal', {
+        incomeType,
         incomeValue: income,
-        incomeRange: income >= MAX_INCOME ? '2L+' : `₹${(income/1000).toFixed(0)}k`
-    });
+        incomeRange: income >= MAX_INCOME ? '2L+' : `₹${(income / 1000).toFixed(0)}k`
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create user. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSkip = () => {
-    navigation.navigate('SpendingGoal', { incomeType, incomeRange: null });
+  const handleSkip = async () => {
+    try {
+      setLoading(true);
+      const response = await authApi.createUser(null as any, 0);
+      const user = response.user || response;
+
+      const profile = await storage.getUserProfile() || {};
+      await storage.setUserProfile({
+        ...profile,
+        id: user.id,
+        phone: user.phone || null,
+        monthly_income: 0,
+        incomeType: incomeType || 'not_set'
+      });
+
+      // Sync to native SharedPreferences for NotificationService
+      const { NotificationPermissionModule } = NativeModules;
+      if (NotificationPermissionModule) {
+        NotificationPermissionModule.setUserId(user.id);
+        if (response.token) {
+          NotificationPermissionModule.setAuthToken(response.token);
+        }
+      }
+
+      navigation.navigate('SpendingGoal', { incomeType, incomeRange: null });
+    } catch (error) {
+      navigation.navigate('SpendingGoal', { incomeType, incomeRange: null });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,28 +128,28 @@ const MonthlyIncomeStep = ({ navigation, route }: any) => {
 
         <View style={styles.sliderContainer}>
           <View style={styles.amountDisplay}>
-             <Text style={styles.currencySymbol}>₹</Text>
-             <Text style={styles.amountText}>{income.toLocaleString()}</Text>
-             {income >= MAX_INCOME && <Text style={styles.plusSign}>+</Text>}
+            <Text style={styles.currencySymbol}>₹</Text>
+            <Text style={styles.amountText}>{income.toLocaleString()}</Text>
+            {income >= MAX_INCOME && <Text style={styles.plusSign}>+</Text>}
           </View>
 
           <View style={styles.trackContainer}>
             <View style={styles.trackBackground} />
-            <Animated.View 
-                style={[
-                    styles.trackFill, 
-                    { width: scrollX }
-                ]} 
+            <Animated.View
+              style={[
+                styles.trackFill,
+                { width: scrollX }
+              ]}
             />
-            <Animated.View 
-                {...panResponder.panHandlers}
-                style={[
-                    styles.thumb,
-                    { transform: [{ translateX: scrollX }] }
-                ]}
+            <Animated.View
+              {...panResponder.panHandlers}
+              style={[
+                styles.thumb,
+                { transform: [{ translateX: scrollX }] }
+              ]}
             />
           </View>
-          
+
           <View style={styles.labelsContainer}>
             <Text style={styles.label}>₹0</Text>
             <Text style={styles.label}>₹1L</Text>
@@ -94,24 +158,30 @@ const MonthlyIncomeStep = ({ navigation, route }: any) => {
         </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity 
-            style={styles.continueButton}
+          <TouchableOpacity
+            style={[styles.continueButton, loading && { opacity: 0.7 }]}
             activeOpacity={0.8}
             onPress={handleContinue}
+            disabled={loading}
           >
-            <LinearGradient 
-              colors={['#4F46E5', '#3730A3']} 
+            <LinearGradient
+              colors={['#4F46E5', '#3730A3']}
               style={styles.gradient}
-              start={{ x: 0, y: 0 }} 
+              start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
-              <Text style={styles.continueText}>CONTINUE</Text>
+              {loading ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.continueText}>CONTINUE</Text>
+              )}
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.skipButton}
             onPress={handleSkip}
+            disabled={loading}
           >
             <Text style={styles.skipText}>SKIP</Text>
           </TouchableOpacity>
