@@ -3,16 +3,17 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  SafeAreaView, 
   FlatList, 
   TextInput, 
   TouchableOpacity,
   ScrollView,
   ActivityIndicator
 } from 'react-native';
-import { Search, Filter, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { Search, TrendingDown, TrendingUp } from 'lucide-react-native';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOW } from '../../utils/theme';
 import { transactionsApi } from '../../services/api';
+import Screen from '../../components/ui/Screen';
+import ElevatedCard from '../../components/ui/ElevatedCard';
 
 const FILTERS = ['All', 'Credit', 'Debit', 'Food', 'Travel', 'Shopping', 'Bills'];
 
@@ -80,12 +81,12 @@ const TransactionsScreen = ({ navigation }: any) => {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <Screen safeAreaStyle={styles.safeArea}>
       <View style={styles.container}>
         <Text style={styles.headerTitle}>Transactions</Text>
 
         {/* Search Bar */}
-        <View style={styles.searchBar}>
+        <ElevatedCard style={styles.searchBar}>
           <Search size={20} color={COLORS.textLight} />
           <TextInput 
             style={styles.searchInput}
@@ -94,7 +95,7 @@ const TransactionsScreen = ({ navigation }: any) => {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-        </View>
+        </ElevatedCard>
 
         {/* Filters */}
         <View>
@@ -103,7 +104,7 @@ const TransactionsScreen = ({ navigation }: any) => {
               <TouchableOpacity 
                 key={filter}
                 style={[
-                  styles.filterButton, 
+                  styles.filterButton,
                   activeFilter === filter && styles.activeFilterButton
                 ]}
                 onPress={() => setActiveFilter(filter)}
@@ -139,7 +140,7 @@ const TransactionsScreen = ({ navigation }: any) => {
             />
         )}
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 };
 

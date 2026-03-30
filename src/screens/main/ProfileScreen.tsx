@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
@@ -13,10 +12,12 @@ import {
   ScrollView
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { User, Phone, CheckCircle2, ChevronRight, LogOut } from 'lucide-react-native';
-import { COLORS, SPACING, BORDER_RADIUS, SHADOW, GRADIENTS } from '../../utils/theme';
+import { User, Phone, CheckCircle2, ChevronRight, LogOut, Wallet } from 'lucide-react-native';
+import { COLORS, SPACING, BORDER_RADIUS, GRADIENTS } from '../../utils/theme';
 import { authApi } from '../../services/api';
 import storage from '../../services/storage';
+import Screen from '../../components/ui/Screen';
+import ElevatedCard from '../../components/ui/ElevatedCard';
 
 const ProfileScreen = () => {
   const [profile, setProfile] = useState<any>(null);
@@ -24,37 +25,49 @@ const ProfileScreen = () => {
   const [salary, setSalary] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingSalary, setIsEditingSalary] = useState(false);
+  const [balance, setBalance] = useState('');
+  const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [loading, setLoading] = useState(false);
+  const sanitizePhone = (value: string) => value.replace(/\D/g, '');
+
+  const loadProfile = useCallback(async () => {
+    try {
+      const data = await storage.getUserProfile();
+      setProfile(data);
+      if (data?.phone) setPhone(data.phone);
+      if (data?.monthly_income !== undefined) setSalary(data.monthly_income.toString());
+      if (data?.current_balance !== undefined && data?.current_balance !== null) {
+        setBalance(data.current_balance.toString());
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load profile data');
+    }
+  }, []);
 
   useEffect(() => {
     loadProfile();
-  }, []);
+  }, [loadProfile]);
 
-  const loadProfile = async () => {
-    const data = await storage.getUserProfile();
-    setProfile(data);
-    if (data?.phone) {
-      setPhone(data.phone);
-    }
-    if (data?.monthly_income !== undefined) {
-      setSalary(data.monthly_income.toString());
-    }
-  };
+  const persistProfile = useCallback(async (patch: Record<string, any>) => {
+    const newProfile = { ...profile, ...patch };
+    await storage.setUserProfile(newProfile);
+    setProfile(newProfile);
+  }, [profile]);
 
   const handleUpdatePhone = async () => {
-    if (!phone || phone.length < 10) {
+    const normalizedPhone = sanitizePhone(phone);
+    if (!normalizedPhone || normalizedPhone.length < 10) {
       Alert.alert('Error', 'Please enter a valid phone number');
       return;
     }
 
     try {
       setLoading(true);
-      const userId = profile?.id || 1;
-      await authApi.updateUserPhone(userId, phone);
-
-      const newProfile = { ...profile, phone };
-      await storage.setUserProfile(newProfile);
-      setProfile(newProfile);
+      const userId = profile?.id;
+      if (!userId) throw new Error('User ID missing');
+      await authApi.updateUserPhone(userId, normalizedPhone);
+      await persistProfile({ phone: normalizedPhone });
+      setPhone(normalizedPhone);
       setIsEditing(false);
       Alert.alert('Success', 'Phone number updated successfully!');
     } catch (error) {
@@ -65,7 +78,7 @@ const ProfileScreen = () => {
   };
 
   const handleUpdateSalary = async () => {
-    const salaryNum = parseFloat(salary);
+    const salaryNum = Number(salary.trim());
     if (isNaN(salaryNum) || salaryNum < 0) {
       Alert.alert('Error', 'Please enter a valid salary');
       return;
@@ -73,12 +86,11 @@ const ProfileScreen = () => {
 
     try {
       setLoading(true);
-      const userId = profile?.id || 1;
+      const userId = profile?.id;
+      if (!userId) throw new Error('User ID missing');
       await authApi.updateUserSalary(userId, salaryNum);
-
-      const newProfile = { ...profile, monthly_income: salaryNum };
-      await storage.setUserProfile(newProfile);
-      setProfile(newProfile);
+      await persistProfile({ monthly_income: salaryNum });
+      setSalary(String(salaryNum));
       setIsEditingSalary(false);
       Alert.alert('Success', 'Salary updated successfully!');
     } catch (error) {
@@ -87,13 +99,39 @@ const ProfileScreen = () => {
       setLoading(false);
     }
   };
+  const handleUpdateBalance = async () => {
+    const balanceNum = Number(balance.trim());
 
+    if (isNaN(balanceNum) || balanceNum < 0) {
+      Alert.alert('Error', 'Please enter a valid balance');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const userId = profile?.id;
+      if (!userId) throw new Error('User ID missing');
+      await authApi.updateUserBalance(userId, balanceNum);
+      await persistProfile({ current_balance: balanceNum });
+      setBalance(String(balanceNum));
+      setIsEditingBalance(false);
+      Alert.alert('Success', 'Balance updated successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update balance');
+    } finally {
+      setLoading(false);
+    }
+  };
   const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to logout? This will clear your experimental data.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Logout', style: 'destructive', onPress: async () => {
-          await storage.clear();
+          try {
+            await storage.clear();
+          } catch (error) {
+            Alert.alert('Error', 'Logout failed. Please try again.');
+          }
           // In a real app, you'd navigate back to splash or onboarding
           // navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
         }
@@ -102,7 +140,7 @@ const ProfileScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <Screen safeAreaStyle={styles.safeArea}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -111,7 +149,7 @@ const ProfileScreen = () => {
           <Text style={styles.headerTitle}>Profile</Text>
 
           {/* User Header */}
-          <View style={styles.profileHeader}>
+          <ElevatedCard style={styles.profileHeader}>
             <LinearGradient colors={GRADIENTS.primary} style={styles.avatar}>
               <User color={COLORS.white} size={40} />
             </LinearGradient>
@@ -119,11 +157,35 @@ const ProfileScreen = () => {
               <Text style={styles.userName}>{profile?.name || 'Sufi Turab'}</Text>
               <Text style={styles.userRole}>Premium Member</Text>
             </View>
-          </View>
+          </ElevatedCard>
 
           {/* Stats Section */}
           <View style={styles.statsRow}>
-            <View style={styles.statBox}>
+            <ElevatedCard style={styles.statBox}>
+              <Wallet size={20} color={COLORS.primary} />
+              {isEditingBalance ? (
+                <View style={styles.editSalaryRow}>
+                  <TextInput
+                    style={styles.salaryInput}
+                    value={balance}
+                    onChangeText={setBalance}
+                    keyboardType="numeric"
+                    autoFocus
+                  />
+                  <TouchableOpacity onPress={handleUpdateBalance}>
+                    {loading ? <ActivityIndicator size="small" /> : <CheckCircle2 size={20} color={COLORS.income} />}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={() => setIsEditingBalance(true)}>
+                  <Text style={styles.statValue}>
+                    ₹{(profile?.current_balance || 0).toLocaleString()}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <Text style={styles.statLabel}>Current Balance</Text>
+            </ElevatedCard>
+            <ElevatedCard style={styles.statBox}>
               {isEditingSalary ? (
                 <View style={styles.editSalaryRow}>
                   <TextInput
@@ -143,18 +205,18 @@ const ProfileScreen = () => {
                 </TouchableOpacity>
               )}
               <Text style={styles.statLabel}>Monthly Income</Text>
-            </View>
-            <View style={styles.statBox}>
+            </ElevatedCard>
+            <ElevatedCard style={styles.statBox}>
               <Text style={styles.statValue}>{profile?.incomeType || 'Salary'}</Text>
               <Text style={styles.statLabel}>Source</Text>
-            </View>
+            </ElevatedCard>
           </View>
 
           {/* Info Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Contact Information</Text>
 
-            <View style={styles.infoCard}>
+            <ElevatedCard style={styles.infoCard}>
               <View style={styles.infoRow}>
                 <View style={styles.iconCircle}>
                   <Phone size={20} color={COLORS.primary} />
@@ -184,29 +246,35 @@ const ProfileScreen = () => {
                   </TouchableOpacity>
                 )}
               </View>
-            </View>
+            </ElevatedCard>
           </View>
 
           {/* Settings Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>App Settings</Text>
-            <TouchableOpacity style={styles.settingsItem}>
+            <ElevatedCard style={styles.settingsItem}>
+              <TouchableOpacity style={styles.settingsItemContent}>
               <Text style={styles.settingsLabel}>Notifications</Text>
               <ChevronRight size={20} color={COLORS.textLight} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.settingsItem}>
+              </TouchableOpacity>
+            </ElevatedCard>
+            <ElevatedCard style={styles.settingsItem}>
+              <TouchableOpacity style={styles.settingsItemContent}>
               <Text style={styles.settingsLabel}>Privacy Policy</Text>
               <ChevronRight size={20} color={COLORS.textLight} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.settingsItem} onPress={handleLogout}>
+              </TouchableOpacity>
+            </ElevatedCard>
+            <ElevatedCard style={styles.settingsItem}>
+              <TouchableOpacity style={styles.settingsItemContent} onPress={handleLogout}>
               <Text style={[styles.settingsLabel, { color: COLORS.expense }]}>Logout</Text>
               <LogOut size={20} color={COLORS.expense} />
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </ElevatedCard>
           </View>
 
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
@@ -228,10 +296,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: SPACING.xl,
-    backgroundColor: COLORS.card,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    ...SHADOW,
     elevation: 4,
   },
   avatar: {
@@ -259,27 +324,30 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'stretch',
     marginBottom: SPACING.xl,
   },
   statBox: {
-    flex: 0.48,
-    backgroundColor: COLORS.card,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
+    width: '31.5%',
+    minHeight: 132,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.sm,
+    justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOW,
     elevation: 2,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.textDark,
     marginBottom: 4,
+    textAlign: 'center',
   },
   statLabel: {
     fontSize: 12,
     color: COLORS.textLight,
     fontWeight: '600',
+    textAlign: 'center',
   },
   section: {
     marginBottom: SPACING.xl,
@@ -294,10 +362,7 @@ const styles = StyleSheet.create({
     paddingLeft: SPACING.xs,
   },
   infoCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
-    ...SHADOW,
     elevation: 2,
   },
   infoRow: {
@@ -341,15 +406,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   settingsItem: {
+    marginBottom: SPACING.sm,
+    elevation: 1,
+  },
+  settingsItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.card,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    marginBottom: SPACING.sm,
-    ...SHADOW,
-    elevation: 1,
   },
   settingsLabel: {
     fontSize: 16,

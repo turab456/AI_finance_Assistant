@@ -4,18 +4,15 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  SafeAreaView, 
   ScrollView, 
-  Dimensions, 
-  TouchableOpacity,
   ActivityIndicator
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Lightbulb, AlertTriangle, ArrowUpRight, TrendingUp } from 'lucide-react-native';
-import { COLORS, SPACING, BORDER_RADIUS, SHADOW } from '../../utils/theme';
+import { Lightbulb, AlertTriangle, TrendingUp } from 'lucide-react-native';
+import { COLORS, SPACING, BORDER_RADIUS } from '../../utils/theme';
 import { transactionsApi } from '../../services/api';
-
-const { width } = Dimensions.get('window');
+import Screen from '../../components/ui/Screen';
+import ElevatedCard from '../../components/ui/ElevatedCard';
 
 const InsightsScreen = () => {
   const [loading, setLoading] = useState(true);
@@ -49,12 +46,12 @@ const InsightsScreen = () => {
   const totalSpend = insightData?.total_spend || 0;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <Screen safeAreaStyle={styles.safeArea}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.headerTitle}>Financial Insights</Text>
 
         {/* Monthly Summary */}
-        <View style={styles.summaryContainer}>
+        <ElevatedCard style={styles.summaryContainer}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Total Spend</Text>
             <Text style={[styles.summaryValue, { color: COLORS.expense }]}>
@@ -67,22 +64,22 @@ const InsightsScreen = () => {
                 {insightData?.top_category || 'N/A'}
             </Text>
           </View>
-        </View>
+        </ElevatedCard>
 
         {/* AI Message Card */}
         {insightData?.message && (
-          <View style={styles.messageCard}>
+          <ElevatedCard style={styles.messageCard}>
              <LinearGradient colors={['#EEF2FF', '#E0E7FF']} style={styles.messageGradient}>
                 <Lightbulb size={20} color={COLORS.primary} fill={COLORS.primary} />
                 <Text style={styles.messageText}>{insightData.message}</Text>
              </LinearGradient>
-          </View>
+          </ElevatedCard>
         )}
 
         {/* Category Breakdown */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Category Breakdown</Text>
-          <View style={styles.categoryCard}>
+          <ElevatedCard style={styles.categoryCard}>
             {breakdownData.map((item: any, index: number) => {
               const percentage = totalSpend > 0 ? (item.amount / totalSpend) * 100 : 0;
               const barColor = index % 2 === 0 ? COLORS.primary : '#818CF8';
@@ -108,14 +105,14 @@ const InsightsScreen = () => {
                 </View>
               );
             })}
-          </View>
+          </ElevatedCard>
         </View>
 
         {/* AI Analysis Cards */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>AI Analysis</Text>
           
-          <View style={styles.insightCard}>
+          <ElevatedCard style={styles.insightCard}>
             <View style={[styles.insightHeader, { backgroundColor: '#E0F2FE' }]}>
                 <TrendingUp size={20} color="#0369A1" />
                 <Text style={[styles.insightTitle, { color: '#0369A1' }]}>Spending Trend</Text>
@@ -123,9 +120,9 @@ const InsightsScreen = () => {
             <Text style={styles.insightBody}>
                 {insightData?.message || "Analyzing your spending trends..."}
             </Text>
-          </View>
+          </ElevatedCard>
 
-          <View style={styles.insightCard}>
+          <ElevatedCard style={styles.insightCard}>
             <View style={[styles.insightHeader, { backgroundColor: '#FEF2F2' }]}>
                 <AlertTriangle size={20} color={COLORS.expense} />
                 <Text style={[styles.insightTitle, { color: COLORS.expense }]}>Alert</Text>
@@ -133,11 +130,11 @@ const InsightsScreen = () => {
             <Text style={styles.insightBody}>
                 High spending in {insightData?.top_category}. Try to keep it within 20% of your total budget.
             </Text>
-          </View>
+          </ElevatedCard>
         </View>
 
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
@@ -165,10 +162,7 @@ const styles = StyleSheet.create({
   summaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
-    ...SHADOW,
     elevation: 3,
     marginBottom: SPACING.xl,
   },
@@ -188,9 +182,7 @@ const styles = StyleSheet.create({
   },
   messageCard: {
     marginBottom: SPACING.xl,
-    borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
-    ...SHADOW,
     elevation: 4,
   },
   messageGradient: {
@@ -216,10 +208,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   categoryCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
-    ...SHADOW,
     elevation: 2,
   },
   categoryRow: {
@@ -263,11 +252,9 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   insightCard: {
-    backgroundColor: COLORS.card,
     borderRadius: BORDER_RADIUS.md,
     marginBottom: SPACING.md,
     overflow: 'hidden',
-    ...SHADOW,
     elevation: 2,
   },
   insightHeader: {
