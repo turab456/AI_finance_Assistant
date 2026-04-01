@@ -65,6 +65,7 @@ const HomeScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     let isMounted = true;
+    let connectedUserId: string | number | null = null;
 
     const fetchData = async (forceRefresh = false) => {
       try {
@@ -72,10 +73,15 @@ const HomeScreen = ({ navigation }: any) => {
           setLoading(true);
         }
         let incomeFromApi = 0;
+        let currentBalanceFromMe: number | undefined;
+        let currentBalanceFromCache: number | undefined;
 
         try {
           const me = await authApi.getMe();
           incomeFromApi = me.monthly_income || 0;
+          if (me.current_balance !== undefined && me.current_balance !== null) {
+            currentBalanceFromMe = Number(me.current_balance);
+          }
           if (isMounted) {
             setUserName(me.phone || 'User');
             setShowSalaryPrompt(!me.monthly_income);
@@ -87,10 +93,13 @@ const HomeScreen = ({ navigation }: any) => {
             id: me.id,
             phone: me.phone,
             monthly_income: me.monthly_income,
+            current_balance: me.current_balance ?? existing.current_balance,
           });
         } catch (e) {
           const cached = await storage.getUserProfile();
           const incomeFromCache = cached?.monthly_income || 0;
+          currentBalanceFromCache =
+            cached?.current_balance !== undefined && cached?.current_balance !== null ? Number(cached.current_balance) : undefined;
           if (isMounted) {
             setUserName(cached?.phone || 'User');
             setShowSalaryPrompt(incomeFromCache === 0);
@@ -98,7 +107,13 @@ const HomeScreen = ({ navigation }: any) => {
         }
 
         const { predictions, estimated } = await fetchPrediction();
-        const currentBalance = predictions[0]?.balance || 0;
+        const predictedBalance = predictions[0]?.balance ?? 0;
+        const currentBalance =
+          currentBalanceFromMe !== undefined
+            ? currentBalanceFromMe
+            : currentBalanceFromCache !== undefined
+              ? currentBalanceFromCache
+              : predictedBalance;
         if (isMounted) {
           setIsEstimated(estimated);
         }
@@ -156,32 +171,35 @@ const HomeScreen = ({ navigation }: any) => {
       }
     };
 
+    const handleNewTransaction = async () => {
+      await fetchData(true);
+    };
+
+    const handleConnect = () => {
+      if (connectedUserId !== null) {
+        socketService.emit('join', connectedUserId);
+      }
+    };
+
     const setupApp = async () => {
       await fetchData(false);
       const profile = await storage.getUserProfile();
       const userId = profile?.id;
 
       if (userId) {
+        connectedUserId = userId;
         socketService.connect(userId);
-      const handleConnect = () => {
-          socketService.emit('join', userId);
-      };
+        socketService.on('new_transaction', handleNewTransaction);
         socketService.on('connect', handleConnect);
       }
     };
 
     setupApp();
 
-    const handleNewTransaction = async () => {
-      await fetchData(true);
-    };
-
-    socketService.on('new_transaction', handleNewTransaction);
-
     return () => {
       isMounted = false;
       socketService.off('new_transaction', handleNewTransaction);
-      socketService.off('connect');
+      socketService.off('connect', handleConnect);
       socketService.disconnect();
     };
   }, [fetchPrediction]);
