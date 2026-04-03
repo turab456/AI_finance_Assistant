@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  FlatList,
+  FlatList,  
   StatusBar,
   ActivityIndicator,
   Dimensions
