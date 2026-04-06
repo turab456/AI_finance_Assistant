@@ -1,52 +1,63 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Animated,
-  PanResponder,
-  Dimensions,
-  TextInput,
   ActivityIndicator,
   Alert,
-  NativeModules
+  Animated,
+  Dimensions,
+  NativeModules,
+  PanResponder,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { COLORS, SPACING, BORDER_RADIUS, SHADOW } from '../../utils/theme';
+import { Info, Wallet } from 'lucide-react-native';
+import Screen from '../../components/ui/Screen';
+import PageHeader from '../../components/ui/PageHeader';
+import ElevatedCard from '../../components/ui/ElevatedCard';
+import PrimaryButton from '../../components/ui/PrimaryButton';
+import { COLORS, SHADOW, SPACING } from '../../utils/theme';
 import { authApi } from '../../services/api';
 import storage from '../../services/storage';
+import { capitalize, formatCurrency } from '../../utils/format';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SLIDER_WIDTH = SCREEN_WIDTH - SPACING.lg * 4;
 const MAX_INCOME = 200000;
+const INITIAL_INCOME = 50000;
 
 const MonthlyIncomeStep = ({ navigation, route }: any) => {
   const { incomeType } = route?.params || {};
-  const [income, setIncome] = useState(50000);
+  const [income, setIncome] = useState(INITIAL_INCOME);
   const [loading, setLoading] = useState(false);
 
-  const scrollX = useRef(new Animated.Value((50000 / MAX_INCOME) * SLIDER_WIDTH)).current;
-  const lastScrollX = useRef((50000 / MAX_INCOME) * SLIDER_WIDTH);
+  const initialX = (INITIAL_INCOME / MAX_INCOME) * SLIDER_WIDTH;
+  const scrollX = useRef(new Animated.Value(initialX)).current;
+  const lastScrollX = useRef(initialX);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (_, gestureState) => {
         let newX = lastScrollX.current + gestureState.dx;
-        if (newX < 0) newX = 0;
-        if (newX > SLIDER_WIDTH) newX = SLIDER_WIDTH;
+
+        if (newX < 0) {
+          newX = 0;
+        }
+        if (newX > SLIDER_WIDTH) {
+          newX = SLIDER_WIDTH;
+        }
 
         scrollX.setValue(newX);
-        const calculatedIncome = Math.round((newX / SLIDER_WIDTH) * MAX_INCOME / 1000) * 1000;
+        const calculatedIncome = Math.round(((newX / SLIDER_WIDTH) * MAX_INCOME) / 1000) * 1000;
         setIncome(calculatedIncome);
       },
       onPanResponderRelease: () => {
-        // @ts-ignore
-        lastScrollX.current = scrollX._value;
+        scrollX.stopAnimation(value => {
+          lastScrollX.current = value;
+        });
       },
-    })
+    }),
   ).current;
 
   const handleContinue = async () => {
@@ -54,18 +65,16 @@ const MonthlyIncomeStep = ({ navigation, route }: any) => {
       setLoading(true);
       const response = await authApi.createUser(null as any, income);
       const user = response.user || response;
+      const profile = (await storage.getUserProfile()) || {};
 
-      // Store user info
-      const profile = await storage.getUserProfile() || {};
       await storage.setUserProfile({
         ...profile,
         id: user.id,
         phone: user.phone || null,
         monthly_income: income,
-        incomeType
+        incomeType,
       });
 
-      // Sync to native SharedPreferences for NotificationService
       const { NotificationPermissionModule } = NativeModules;
       if (NotificationPermissionModule) {
         NotificationPermissionModule.setUserId(user.id);
@@ -77,7 +86,7 @@ const MonthlyIncomeStep = ({ navigation, route }: any) => {
       navigation.navigate('SpendingGoal', {
         incomeType,
         incomeValue: income,
-        incomeRange: income >= MAX_INCOME ? '2L+' : `₹${(income / 1000).toFixed(0)}k`
+        incomeRange: income >= MAX_INCOME ? '2L+' : formatCurrency(income),
       });
     } catch (error) {
       Alert.alert('Error', 'Failed to create user. Please try again.');
@@ -91,17 +100,16 @@ const MonthlyIncomeStep = ({ navigation, route }: any) => {
       setLoading(true);
       const response = await authApi.createUser(null as any, 0);
       const user = response.user || response;
+      const profile = (await storage.getUserProfile()) || {};
 
-      const profile = await storage.getUserProfile() || {};
       await storage.setUserProfile({
         ...profile,
         id: user.id,
         phone: user.phone || null,
         monthly_income: 0,
-        incomeType: incomeType || 'not_set'
+        incomeType: incomeType || 'not_set',
       });
 
-      // Sync to native SharedPreferences for NotificationService
       const { NotificationPermissionModule } = NativeModules;
       if (NotificationPermissionModule) {
         NotificationPermissionModule.setUserId(user.id);
@@ -119,75 +127,62 @@ const MonthlyIncomeStep = ({ navigation, route }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.question}>Your monthly income?</Text>
-          <Text style={styles.subQuestion}>Adjust the slider to set your approximate monthly earnings.</Text>
+    <Screen safeAreaStyle={styles.safeArea}>
+      <PageHeader
+        eyebrow="Step 2 of 3"
+        title="Set your monthly income"
+        subtitle="A rough estimate is enough. You can refine it later from the profile screen."
+        onBack={() => navigation.goBack()}
+      />
+
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressDot, styles.progressDotActive]} />
+        <View style={[styles.progressDot, styles.progressDotActive]} />
+        <View style={styles.progressDot} />
+      </View>
+
+      <View style={styles.content}>
+        <View style={styles.selectionPill}>
+          <Text style={styles.selectionPillText}>Income source: {capitalize(incomeType) || 'Not set'}</Text>
         </View>
 
-        <View style={styles.sliderContainer}>
-          <View style={styles.amountDisplay}>
-            <Text style={styles.currencySymbol}>₹</Text>
-            <Text style={styles.amountText}>{income.toLocaleString()}</Text>
-            {income >= MAX_INCOME && <Text style={styles.plusSign}>+</Text>}
+        <ElevatedCard style={styles.sliderCard}>
+          <View style={styles.sliderHeader}>
+            <View style={styles.sliderIcon}>
+              <Wallet size={18} color={COLORS.primary} />
+            </View>
+            <Text style={styles.sliderLabel}>Estimated monthly income</Text>
           </View>
+
+          <Text style={styles.amountText}>{income >= MAX_INCOME ? `${formatCurrency(MAX_INCOME)}+` : formatCurrency(income)}</Text>
+          <Text style={styles.amountHint}>Drag the slider to the closest amount</Text>
 
           <View style={styles.trackContainer}>
             <View style={styles.trackBackground} />
-            <Animated.View
-              style={[
-                styles.trackFill,
-                { width: scrollX }
-              ]}
-            />
-            <Animated.View
-              {...panResponder.panHandlers}
-              style={[
-                styles.thumb,
-                { transform: [{ translateX: scrollX }] }
-              ]}
-            />
+            <Animated.View style={[styles.trackFill, { width: scrollX }]} />
+            <Animated.View {...panResponder.panHandlers} style={[styles.thumb, { transform: [{ translateX: scrollX }] }]} />
           </View>
 
           <View style={styles.labelsContainer}>
-            <Text style={styles.label}>₹0</Text>
-            <Text style={styles.label}>₹1L</Text>
-            <Text style={styles.label}>₹2L+</Text>
+            <Text style={styles.label}>{formatCurrency(0)}</Text>
+            <Text style={styles.label}>{formatCurrency(100000)}</Text>
+            <Text style={styles.label}>{formatCurrency(200000)}+</Text>
           </View>
-        </View>
+        </ElevatedCard>
 
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.continueButton, loading && { opacity: 0.7 }]}
-            activeOpacity={0.8}
-            onPress={handleContinue}
-            disabled={loading}
-          >
-            <LinearGradient
-              colors={['#4F46E5', '#3730A3']}
-              style={styles.gradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              {loading ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text style={styles.continueText}>CONTINUE</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={handleSkip}
-            disabled={loading}
-          >
-            <Text style={styles.skipText}>SKIP</Text>
-          </TouchableOpacity>
+        <View style={styles.noteRow}>
+          <Info size={16} color={COLORS.textLight} />
+          <Text style={styles.noteText}>This estimate improves balance forecasts and spend alerts.</Text>
         </View>
       </View>
-    </SafeAreaView>
+
+      <View style={styles.footer}>
+        <PrimaryButton label="Continue" onPress={handleContinue} loading={loading} />
+        <TouchableOpacity style={styles.skipButton} onPress={handleSkip} disabled={loading} activeOpacity={0.8}>
+          {loading ? <ActivityIndicator size="small" color={COLORS.textLight} /> : <Text style={styles.skipText}>Skip for now</Text>}
+        </TouchableOpacity>
+      </View>
+    </Screen>
   );
 };
 
@@ -196,126 +191,143 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  container: {
-    flex: 1,
-    padding: SPACING.lg,
+  progressTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
   },
-  header: {
-    marginTop: SPACING.xl * 2,
+  progressDot: {
+    flex: 1,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: COLORS.border,
+    marginRight: SPACING.sm,
+  },
+  progressDotActive: {
+    backgroundColor: COLORS.primary,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.xl,
+  },
+  selectionPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: 999,
+    backgroundColor: COLORS.primarySurface,
+    marginBottom: SPACING.lg,
+  },
+  selectionPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  sliderCard: {
+    padding: SPACING.xl,
+  },
+  sliderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: SPACING.xl,
   },
-  question: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: COLORS.textDark,
-    marginBottom: SPACING.sm,
-  },
-  subQuestion: {
-    fontSize: 16,
-    color: COLORS.textMedium,
-    lineHeight: 22,
-  },
-  sliderContainer: {
-    marginTop: SPACING.xl * 2,
+  sliderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySurface,
+    marginRight: SPACING.md,
   },
-  amountDisplay: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: SPACING.xl * 2,
-  },
-  currencySymbol: {
-    fontSize: 24,
+  sliderLabel: {
+    fontSize: 15,
     fontWeight: '700',
-    color: COLORS.primary,
-    marginRight: 4,
+    color: COLORS.textDark,
   },
   amountText: {
-    fontSize: 48,
+    fontSize: 38,
+    lineHeight: 46,
     fontWeight: '800',
     color: COLORS.textDark,
   },
-  plusSign: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginLeft: 4,
+  amountHint: {
+    marginTop: SPACING.sm,
+    fontSize: 14,
+    color: COLORS.textMedium,
   },
   trackContainer: {
     width: SLIDER_WIDTH,
     height: 40,
     justifyContent: 'center',
+    marginTop: SPACING.xl,
+    alignSelf: 'center',
   },
   trackBackground: {
     width: '100%',
     height: 12,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 6,
+    backgroundColor: COLORS.surface,
+    borderRadius: 999,
   },
   trackFill: {
-    height: 12,
-    backgroundColor: COLORS.primary,
-    borderRadius: 6,
     position: 'absolute',
     left: 0,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: COLORS.primary,
   },
   thumb: {
+    position: 'absolute',
+    left: -16,
     width: 32,
     height: 32,
     borderRadius: 16,
     backgroundColor: COLORS.white,
-    position: 'absolute',
-    left: -16,
-    ...SHADOW,
-    elevation: 5,
     borderWidth: 3,
     borderColor: COLORS.primary,
+    ...SHADOW,
   },
   labelsContainer: {
     width: SLIDER_WIDTH,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignSelf: 'center',
     marginTop: SPACING.md,
   },
   label: {
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '700',
     color: COLORS.textLight,
-    fontWeight: '600',
+  },
+  noteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.sm,
+  },
+  noteText: {
+    flex: 1,
+    marginLeft: SPACING.sm,
+    fontSize: 13,
+    lineHeight: 20,
+    color: COLORS.textMedium,
   },
   footer: {
-    marginTop: 'auto',
-    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.xl,
   },
-  continueButton: {
-    width: '100%',
-    height: 56,
-    borderRadius: BORDER_RADIUS.md,
-    overflow: 'hidden',
-    ...SHADOW,
-    elevation: 4,
-    marginBottom: SPACING.md,
-  },
-  gradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  continueText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-  },
   skipButton: {
-    paddingVertical: SPACING.md,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: SPACING.md,
   },
   skipText: {
     fontSize: 14,
-    color: COLORS.textLight,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    color: COLORS.textLight,
   },
 });
 

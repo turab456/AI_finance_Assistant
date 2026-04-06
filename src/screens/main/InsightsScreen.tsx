@@ -1,18 +1,14 @@
-import * as React from 'react';
-import { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  ActivityIndicator
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Lightbulb, AlertTriangle, TrendingUp } from 'lucide-react-native';
-import { COLORS, SPACING, BORDER_RADIUS } from '../../utils/theme';
-import { transactionsApi } from '../../services/api';
+import { AlertTriangle, Lightbulb, TrendingUp } from 'lucide-react-native';
 import Screen from '../../components/ui/Screen';
 import ElevatedCard from '../../components/ui/ElevatedCard';
+import PageHeader from '../../components/ui/PageHeader';
+import SectionHeader from '../../components/ui/SectionHeader';
+import { COLORS, SPACING } from '../../utils/theme';
+import { transactionsApi } from '../../services/api';
+import { capitalize, formatCurrency } from '../../utils/format';
 
 const InsightsScreen = () => {
   const [loading, setLoading] = useState(true);
@@ -42,97 +38,124 @@ const InsightsScreen = () => {
     );
   }
 
-  const breakdownData = insightData?.breakdown || [];
-  const totalSpend = insightData?.total_spend || 0;
+  const totalSpend = Number(insightData?.total_spend || 0);
+  const breakdownData = Array.isArray(insightData?.breakdown) ? insightData.breakdown : [];
+  const sortedBreakdown = breakdownData
+    .map((item: any) => {
+      const amount = Number(item?.amount || 0);
+      const share = totalSpend > 0 ? (amount / totalSpend) * 100 : 0;
+
+      return {
+        ...item,
+        amount,
+        share,
+      };
+    })
+    .sort((first: any, second: any) => second.amount - first.amount);
+
+  const topCategory = sortedBreakdown[0];
 
   return (
     <Screen safeAreaStyle={styles.safeArea}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.headerTitle}>Financial Insights</Text>
+        <PageHeader
+          eyebrow="Analytics"
+          title="Financial insights"
+          subtitle="A cleaner read on where your money is moving this month."
+        />
 
-        {/* Monthly Summary */}
-        <ElevatedCard style={styles.summaryContainer}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Total Spend</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.expense }]}>
-                ₹{totalSpend.toLocaleString()}
-            </Text>
+        <LinearGradient colors={[COLORS.white, COLORS.primarySurface]} style={styles.heroCard}>
+          <Text style={styles.heroLabel}>Total spend</Text>
+          <Text style={styles.heroAmount}>{formatCurrency(totalSpend)}</Text>
+
+          <View style={styles.heroStats}>
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatLabel}>Top category</Text>
+              <Text style={styles.heroStatValue}>{capitalize(topCategory?.category) || 'N/A'}</Text>
+            </View>
+            <View style={styles.heroDivider} />
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatLabel}>Tracked groups</Text>
+              <Text style={styles.heroStatValue}>{sortedBreakdown.length}</Text>
+            </View>
           </View>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Top Category</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.primary, textTransform: 'capitalize' }]}>
-                {insightData?.top_category || 'N/A'}
-            </Text>
-          </View>
+        </LinearGradient>
+
+        {insightData?.message ? (
+          <ElevatedCard style={styles.messageCard}>
+            <View style={styles.messageHeader}>
+              <View style={styles.messageIcon}>
+                <Lightbulb size={18} color={COLORS.primary} />
+              </View>
+              <Text style={styles.messageTitle}>AI summary</Text>
+            </View>
+            <Text style={styles.messageBody}>{insightData.message}</Text>
+          </ElevatedCard>
+        ) : null}
+
+        <SectionHeader
+          title="Trend radar"
+          subtitle="Categories with the biggest share this month"
+          containerStyle={styles.sectionHeader}
+        />
+
+        <ElevatedCard style={styles.breakdownCard}>
+          {sortedBreakdown.length > 0 ? (
+            sortedBreakdown.map((item: any, index: number) => (
+              <View key={`${item.category}-${index}`} style={[styles.breakdownRow, index === sortedBreakdown.length - 1 && styles.breakdownRowLast]}>
+                <View style={styles.breakdownTop}>
+                  <View>
+                    <Text style={styles.breakdownLabel}>{capitalize(item.category)}</Text>
+                    <Text style={styles.breakdownMeta}>{formatCurrency(item.amount)}</Text>
+                  </View>
+                  <Text style={styles.breakdownPercent}>{item.share.toFixed(1)}%</Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${Math.min(item.share, 100)}%` }]} />
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No category data yet</Text>
+              <Text style={styles.emptyBody}>The radar will populate automatically once transactions are tracked.</Text>
+            </View>
+          )}
         </ElevatedCard>
 
-        {/* AI Message Card */}
-        {insightData?.message && (
-          <ElevatedCard style={styles.messageCard}>
-             <LinearGradient colors={['#EEF2FF', '#E0E7FF']} style={styles.messageGradient}>
-                <Lightbulb size={20} color={COLORS.primary} fill={COLORS.primary} />
-                <Text style={styles.messageText}>{insightData.message}</Text>
-             </LinearGradient>
-          </ElevatedCard>
-        )}
+        <SectionHeader title="AI analysis" subtitle="Focused next steps based on current trends" containerStyle={styles.sectionHeader} />
 
-        {/* Category Breakdown */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Category Breakdown</Text>
-          <ElevatedCard style={styles.categoryCard}>
-            {breakdownData.map((item: any, index: number) => {
-              const percentage = totalSpend > 0 ? (item.amount / totalSpend) * 100 : 0;
-              const barColor = index % 2 === 0 ? COLORS.primary : '#818CF8';
-              
-              return (
-                <View key={item.category} style={styles.categoryRow}>
-                  <View style={styles.categoryInfo}>
-                      <View style={[styles.colorDot, { backgroundColor: barColor }]} />
-                      <Text style={styles.categoryLabel}>{item.category.charAt(0).toUpperCase() + item.category.slice(1)}</Text>
-                  </View>
-                  <View style={styles.categoryBarContainer}>
-                      <View 
-                          style={[
-                              styles.categoryBar, 
-                              { 
-                                  width: `${percentage}%`, 
-                                  backgroundColor: barColor
-                              }
-                          ]} 
-                      />
-                  </View>
-                  <Text style={styles.categoryPercent}>{percentage.toFixed(1)}%</Text>
-                </View>
-              );
-            })}
-          </ElevatedCard>
-        </View>
-
-        {/* AI Analysis Cards */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>AI Analysis</Text>
-          
-          <ElevatedCard style={styles.insightCard}>
-            <View style={[styles.insightHeader, { backgroundColor: '#E0F2FE' }]}>
-                <TrendingUp size={20} color="#0369A1" />
-                <Text style={[styles.insightTitle, { color: '#0369A1' }]}>Spending Trend</Text>
+        <ElevatedCard style={styles.analysisCard}>
+          <View style={styles.analysisBlock}>
+            <View style={[styles.analysisBadge, { backgroundColor: '#E0F2FE' }]}>
+              <TrendingUp size={18} color="#0369A1" />
             </View>
-            <Text style={styles.insightBody}>
-                {insightData?.message || "Analyzing your spending trends..."}
-            </Text>
-          </ElevatedCard>
-
-          <ElevatedCard style={styles.insightCard}>
-            <View style={[styles.insightHeader, { backgroundColor: '#FEF2F2' }]}>
-                <AlertTriangle size={20} color={COLORS.expense} />
-                <Text style={[styles.insightTitle, { color: COLORS.expense }]}>Alert</Text>
+            <View style={styles.analysisCopy}>
+              <Text style={styles.analysisTitle}>Growth signal</Text>
+              <Text style={styles.analysisBody}>
+                {topCategory
+                  ? `${capitalize(topCategory.category)} is the strongest spending trend right now, so reviewing that category first should have the biggest impact.`
+                  : 'As new spend appears, this section will highlight the strongest movement first.'}
+              </Text>
             </View>
-            <Text style={styles.insightBody}>
-                High spending in {insightData?.top_category}. Try to keep it within 20% of your total budget.
-            </Text>
-          </ElevatedCard>
-        </View>
+          </View>
 
+          <View style={styles.analysisDivider} />
+
+          <View style={styles.analysisBlock}>
+            <View style={[styles.analysisBadge, { backgroundColor: '#FEF2F2' }]}>
+              <AlertTriangle size={18} color={COLORS.expense} />
+            </View>
+            <View style={styles.analysisCopy}>
+              <Text style={styles.analysisTitle}>Watch-out</Text>
+              <Text style={styles.analysisBody}>
+                {topCategory
+                  ? `Try keeping ${capitalize(topCategory.category)} within a tighter limit next month if you want cleaner balance improvement.`
+                  : 'Once enough activity is captured, the app will start flagging the categories that need attention.'}
+              </Text>
+            </View>
+          </View>
+        </ElevatedCard>
       </ScrollView>
     </Screen>
   );
@@ -151,127 +174,186 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: SPACING.xl,
-    paddingHorizontal: SPACING.lg,
   },
-  headerTitle: {
-    fontSize: 24,
+  heroCard: {
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.xl,
+    borderRadius: 28,
+    padding: SPACING.xl,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  heroLabel: {
+    fontSize: 13,
     fontWeight: '700',
+    color: COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  heroAmount: {
+    marginTop: SPACING.sm,
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '800',
     color: COLORS.textDark,
-    marginVertical: SPACING.lg,
   },
-  summaryContainer: {
+  heroStats: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: SPACING.lg,
-    elevation: 3,
-    marginBottom: SPACING.xl,
-  },
-  summaryItem: {
     alignItems: 'center',
+    marginTop: SPACING.xl,
+    paddingTop: SPACING.lg,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  heroStat: {
     flex: 1,
   },
-  summaryLabel: {
-    fontSize: 12,
-    color: COLORS.textLight,
-    fontWeight: '600',
-    marginBottom: SPACING.xs,
+  heroDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: COLORS.border,
+    marginHorizontal: SPACING.lg,
   },
-  summaryValue: {
+  heroStatLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  heroStatValue: {
+    marginTop: 6,
     fontSize: 16,
     fontWeight: '700',
+    color: COLORS.textDark,
   },
   messageCard: {
-    marginBottom: SPACING.xl,
-    overflow: 'hidden',
-    elevation: 4,
-  },
-  messageGradient: {
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
     padding: SPACING.lg,
+  },
+  messageHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: SPACING.md,
   },
-  messageText: {
-    flex: 1,
-    marginLeft: SPACING.md,
-    fontSize: 14,
-    color: COLORS.primaryDark,
-    fontWeight: '600',
-    lineHeight: 20,
+  messageIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySurface,
+    marginRight: SPACING.md,
   },
-  sectionContainer: {
-    marginBottom: SPACING.xl,
-  },
-  sectionTitle: {
-    fontSize: 18,
+  messageTitle: {
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.textDark,
-    marginBottom: SPACING.md,
   },
-  categoryCard: {
-    padding: SPACING.lg,
-    elevation: 2,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  categoryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 80,
-  },
-  colorDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: SPACING.sm,
-  },
-  categoryLabel: {
-    fontSize: 13,
-    color: COLORS.textDark,
-    fontWeight: '500',
-  },
-  categoryBarContainer: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 4,
-    marginHorizontal: SPACING.md,
-    overflow: 'hidden',
-  },
-  categoryBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  categoryPercent: {
-    fontSize: 12,
-    color: COLORS.textLight,
-    fontWeight: '600',
-    width: 30,
-    textAlign: 'right',
-  },
-  insightCard: {
-    borderRadius: BORDER_RADIUS.md,
-    marginBottom: SPACING.md,
-    overflow: 'hidden',
-    elevation: 2,
-  },
-  insightHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-  },
-  insightTitle: {
+  messageBody: {
     fontSize: 14,
-    fontWeight: '700',
-    marginLeft: SPACING.sm,
-  },
-  insightBody: {
-    padding: SPACING.md,
-    fontSize: 14,
+    lineHeight: 22,
     color: COLORS.textMedium,
+  },
+  sectionHeader: {
+    paddingHorizontal: SPACING.lg,
+  },
+  breakdownCard: {
+    marginHorizontal: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  breakdownRow: {
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  breakdownRowLast: {
+    borderBottomWidth: 0,
+  },
+  breakdownTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
+  },
+  breakdownLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textDark,
+  },
+  breakdownMeta: {
+    marginTop: 4,
+    fontSize: 13,
+    color: COLORS.textMedium,
+  },
+  breakdownPercent: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: COLORS.surface,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: COLORS.primary,
+  },
+  analysisCard: {
+    marginHorizontal: SPACING.lg,
+    padding: SPACING.lg,
+  },
+  analysisBlock: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  analysisBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  analysisCopy: {
+    flex: 1,
+  },
+  analysisTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textDark,
+  },
+  analysisBody: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 21,
+    color: COLORS.textMedium,
+  },
+  analysisDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: SPACING.lg,
+  },
+  emptyState: {
+    paddingVertical: SPACING.xl,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textDark,
+  },
+  emptyBody: {
+    marginTop: SPACING.sm,
+    fontSize: 13,
     lineHeight: 20,
+    color: COLORS.textMedium,
+    textAlign: 'center',
   },
 });
 

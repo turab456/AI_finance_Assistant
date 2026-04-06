@@ -1,59 +1,60 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, FlatList } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { COLORS, GRADIENTS, SPACING, BORDER_RADIUS, SHADOW } from '../../utils/theme';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ArrowLeftRight, Briefcase, ChevronRight, Landmark, PenTool } from 'lucide-react-native';
+import Screen from '../../components/ui/Screen';
+import PageHeader from '../../components/ui/PageHeader';
+import ElevatedCard from '../../components/ui/ElevatedCard';
+import { COLORS, SPACING } from '../../utils/theme';
 
 const INCOME_TYPES = [
-  { id: 'salary', label: 'Salary', icon: '💼' },
-  { id: 'business', label: 'Business', icon: '🏢' },
-  { id: 'freelance', label: 'Freelance', icon: '🎨' },
-  { id: 'mixed', label: 'Mixed', icon: '🔄' },
+  { id: 'salary', label: 'Salary', description: 'Best if most income lands on a regular monthly cycle.', icon: Briefcase },
+  { id: 'business', label: 'Business', description: 'Good for owner income, payouts, and company transfers.', icon: Landmark },
+  { id: 'freelance', label: 'Freelance', description: 'Useful when income arrives project by project.', icon: PenTool },
+  { id: 'mixed', label: 'Mixed', description: 'Choose this if your inflow comes from several sources.', icon: ArrowLeftRight },
 ];
 
 const IncomeTypeStep = ({ navigation }: any) => {
   const handleSelect = (incomeType: string) => {
-    // We could store it here or in localized state
     navigation.navigate('MonthlyIncome', { incomeType });
   };
 
-  const renderItem = ({ item }: any) => (
-    <TouchableOpacity 
-      style={styles.card} 
-      activeOpacity={0.8}
-      onPress={() => handleSelect(item.id)}
-    >
-      <Text style={styles.icon}>{item.icon}</Text>
-      <Text style={styles.label}>{item.label}</Text>
-    </TouchableOpacity>
-  );
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.question}>Where does most of your money come from?</Text>
-          <Text style={styles.subQuestion}>Select one option to personalize your experience.</Text>
-        </View>
+    <Screen safeAreaStyle={styles.safeArea}>
+      <PageHeader
+        eyebrow="Step 1 of 3"
+        title="Where does most of your income come from?"
+        subtitle="Choose the closest match so the dashboard can shape spending trends more accurately."
+        onBack={() => navigation.goBack()}
+      />
 
-        <View style={styles.grid}>
-          {INCOME_TYPES.map((item) => (
-            <TouchableOpacity 
-              key={item.id}
-              style={styles.card} 
-              activeOpacity={0.8}
-              onPress={() => handleSelect(item.id)}
-            >
-              <Text style={styles.icon}>{item.icon}</Text>
-              <Text style={styles.label}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.footer}>
-          {/* Progress or other indicators can go here */}
-        </View>
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressDot, styles.progressDotActive]} />
+        <View style={styles.progressDot} />
+        <View style={styles.progressDot} />
       </View>
-    </SafeAreaView>
+
+      <View style={styles.grid}>
+        {INCOME_TYPES.map(item => {
+          const Icon = item.icon;
+
+          return (
+            <TouchableOpacity key={item.id} activeOpacity={0.82} onPress={() => handleSelect(item.id)} style={styles.cardWrap}>
+              <ElevatedCard style={styles.card}>
+                <View style={styles.cardIcon}>
+                  <Icon size={22} color={COLORS.primary} />
+                </View>
+                <Text style={styles.cardTitle}>{item.label}</Text>
+                <Text style={styles.cardDescription}>{item.description}</Text>
+                <View style={styles.cardFooter}>
+                  <Text style={styles.cardAction}>Select</Text>
+                  <ChevronRight size={18} color={COLORS.primary} />
+                </View>
+              </ElevatedCard>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </Screen>
   );
 };
 
@@ -62,53 +63,69 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  container: {
+  progressTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
+  },
+  progressDot: {
     flex: 1,
-    padding: SPACING.lg,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: COLORS.border,
+    marginRight: SPACING.sm,
   },
-  header: {
-    marginVertical: SPACING.xl,
-  },
-  question: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.textDark,
-    marginBottom: SPACING.sm,
-  },
-  subQuestion: {
-    fontSize: 14,
-    color: COLORS.textMedium,
+  progressDotActive: {
+    backgroundColor: COLORS.primary,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.lg,
+  },
+  cardWrap: {
+    width: '48%',
+    marginBottom: SPACING.md,
   },
   card: {
-    width: '47%',
-    aspectRatio: 1,
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
-    justifyContent: 'center',
+    minHeight: 196,
+    padding: SPACING.lg,
+  },
+  cardIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
     alignItems: 'center',
-    marginBottom: SPACING.md,
-    ...SHADOW,
-    elevation: 3,
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySurface,
+    marginBottom: SPACING.lg,
   },
-  icon: {
-    fontSize: 32,
-    marginBottom: SPACING.sm,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
     color: COLORS.textDark,
   },
-  footer: {
+  cardDescription: {
+    marginTop: SPACING.sm,
+    fontSize: 13,
+    lineHeight: 20,
+    color: COLORS.textMedium,
+  },
+  cardFooter: {
     marginTop: 'auto',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: SPACING.lg,
+  },
+  cardAction: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
 });
 

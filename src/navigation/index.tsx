@@ -17,7 +17,7 @@ import InsightsScreen from '../screens/main/InsightsScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import NotificationPermissionScreen from '../screens/NotificationPermissionScreen';
 
-import { COLORS } from '../utils/theme';
+import { COLORS, SHADOW } from '../utils/theme';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -40,16 +40,13 @@ const MainTabNavigator = () => (
       tabBarActiveTintColor: COLORS.primary,
       tabBarInactiveTintColor: COLORS.textLight,
       tabBarStyle: {
-        height: 70,
-        paddingBottom: 12,
+        height: 68,
+        paddingBottom: 10,
         paddingTop: 8,
         backgroundColor: COLORS.card,
-        borderTopWidth: 0,
-        elevation: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        ...SHADOW,
       },
       tabBarLabelStyle: {
         fontSize: 12,

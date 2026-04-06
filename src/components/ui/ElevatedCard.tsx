@@ -14,8 +14,9 @@ const ElevatedCard = ({ children, style }: ElevatedCardProps) => {
         {
           backgroundColor: COLORS.card,
           borderRadius: BORDER_RADIUS.lg,
+          borderWidth: 1,
+          borderColor: COLORS.border,
           ...SHADOW,
-          elevation: 2,
         },
         style,
       ]}
