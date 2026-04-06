@@ -15,8 +15,8 @@ const FEATURES = [
 
 const WelcomeStep = ({ navigation }: any) => {
   return (
-    <Screen safeAreaStyle={styles.safeArea}>
-      <View style={styles.container}>
+    <Screen safeAreaStyle={styles.safeArea} >
+      <View style={styles.container} >
         <View>
           <LinearGradient colors={GRADIENTS.primary} style={styles.heroCard}>
             <View style={styles.heroBadge}>
