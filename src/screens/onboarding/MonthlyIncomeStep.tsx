@@ -1,71 +1,82 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Animated,
-  PanResponder,
-  Dimensions,
-  TextInput,
   ActivityIndicator,
   Alert,
-  NativeModules
+  Animated,
+  Dimensions,
+  NativeModules,
+  PanResponder,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Image,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { COLORS, SPACING, BORDER_RADIUS, SHADOW } from '../../utils/theme';
+import { Wallet } from 'lucide-react-native';
+import Screen from '../../components/ui/Screen';
+import PrimaryButton from '../../components/ui/PrimaryButton';
+import { COLORS } from '../../utils/theme';
 import { authApi } from '../../services/api';
 import storage from '../../services/storage';
+import { capitalize, formatCurrency } from '../../utils/format';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const SLIDER_WIDTH = SCREEN_WIDTH - SPACING.lg * 4;
+const SLIDER_WIDTH = SCREEN_WIDTH - 80;
 const MAX_INCOME = 200000;
+const INITIAL_INCOME = 50000;
+
+const PRIMARY = '#09356B';
+const BG_COLOR = '#F1F5F9';
 
 const MonthlyIncomeStep = ({ navigation, route }: any) => {
   const { incomeType } = route?.params || {};
-  const [income, setIncome] = useState(50000);
-  const [loading, setLoading] = useState(false);
+  const [income, setIncome] = useState(INITIAL_INCOME);
+  const [loadingAction, setLoadingAction] = useState<'continue' | 'skip' | null>(null);
 
-  const scrollX = useRef(new Animated.Value((50000 / MAX_INCOME) * SLIDER_WIDTH)).current;
-  const lastScrollX = useRef((50000 / MAX_INCOME) * SLIDER_WIDTH);
+  const initialX = (INITIAL_INCOME / MAX_INCOME) * SLIDER_WIDTH;
+  const scrollX = useRef(new Animated.Value(initialX)).current;
+  const lastScrollX = useRef(initialX);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (_, gestureState) => {
         let newX = lastScrollX.current + gestureState.dx;
-        if (newX < 0) newX = 0;
-        if (newX > SLIDER_WIDTH) newX = SLIDER_WIDTH;
+
+        if (newX < 0) {
+          newX = 0;
+        }
+        if (newX > SLIDER_WIDTH) {
+          newX = SLIDER_WIDTH;
+        }
 
         scrollX.setValue(newX);
-        const calculatedIncome = Math.round((newX / SLIDER_WIDTH) * MAX_INCOME / 1000) * 1000;
+        const calculatedIncome = Math.round(((newX / SLIDER_WIDTH) * MAX_INCOME) / 1000) * 1000;
         setIncome(calculatedIncome);
       },
       onPanResponderRelease: () => {
-        // @ts-ignore
-        lastScrollX.current = scrollX._value;
+        scrollX.stopAnimation(value => {
+          lastScrollX.current = value;
+        });
       },
-    })
+    }),
   ).current;
 
   const handleContinue = async () => {
     try {
-      setLoading(true);
+      setLoadingAction('continue');
       const response = await authApi.createUser(null as any, income);
       const user = response.user || response;
+      const profile = (await storage.getUserProfile()) || {};
 
-      // Store user info
-      const profile = await storage.getUserProfile() || {};
       await storage.setUserProfile({
         ...profile,
         id: user.id,
         phone: user.phone || null,
         monthly_income: income,
-        incomeType
+        incomeType,
       });
 
-      // Sync to native SharedPreferences for NotificationService
       const { NotificationPermissionModule } = NativeModules;
       if (NotificationPermissionModule) {
         NotificationPermissionModule.setUserId(user.id);
@@ -77,31 +88,30 @@ const MonthlyIncomeStep = ({ navigation, route }: any) => {
       navigation.navigate('SpendingGoal', {
         incomeType,
         incomeValue: income,
-        incomeRange: income >= MAX_INCOME ? '2L+' : `₹${(income / 1000).toFixed(0)}k`
+        incomeRange: income >= MAX_INCOME ? '2L+' : formatCurrency(income),
       });
     } catch (error) {
       Alert.alert('Error', 'Failed to create user. Please try again.');
     } finally {
-      setLoading(false);
+      setLoadingAction(null);
     }
   };
 
   const handleSkip = async () => {
     try {
-      setLoading(true);
+      setLoadingAction('skip');
       const response = await authApi.createUser(null as any, 0);
       const user = response.user || response;
+      const profile = (await storage.getUserProfile()) || {};
 
-      const profile = await storage.getUserProfile() || {};
       await storage.setUserProfile({
         ...profile,
         id: user.id,
         phone: user.phone || null,
         monthly_income: 0,
-        incomeType: incomeType || 'not_set'
+        incomeType: incomeType || 'not_set',
       });
 
-      // Sync to native SharedPreferences for NotificationService
       const { NotificationPermissionModule } = NativeModules;
       if (NotificationPermissionModule) {
         NotificationPermissionModule.setUserId(user.id);
@@ -114,208 +124,257 @@ const MonthlyIncomeStep = ({ navigation, route }: any) => {
     } catch (error) {
       navigation.navigate('SpendingGoal', { incomeType, incomeRange: null });
     } finally {
-      setLoading(false);
+      setLoadingAction(null);
     }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.question}>Your monthly income?</Text>
-          <Text style={styles.subQuestion}>Adjust the slider to set your approximate monthly earnings.</Text>
-        </View>
+    <View style={styles.fullscreen}>
+      {/* Full Screen Background Image */}
+      <Image 
+        source={require('../../assets/welcomeimg.jpg')} 
+        style={styles.backgroundImage} 
+        resizeMode="cover" 
+      />
 
-        <View style={styles.sliderContainer}>
-          <View style={styles.amountDisplay}>
-            <Text style={styles.currencySymbol}>₹</Text>
-            <Text style={styles.amountText}>{income.toLocaleString()}</Text>
-            {income >= MAX_INCOME && <Text style={styles.plusSign}>+</Text>}
+      <Screen safeAreaStyle={styles.safeArea} withContentWrapper={false}>
+        <View style={styles.container}>
+          
+          <View style={styles.spacer} />
+
+          {/* Bottom Card */}
+          <View style={styles.bottomCard}>
+            <View style={styles.cardContent}>
+              
+              <View style={styles.titleContainer}>
+                <Text style={styles.eyebrow}>STEP 2 OF 3</Text>
+                <Text style={styles.title}>Set your monthly income</Text>
+                <Text style={styles.subtitle}>
+                  A rough estimate is enough. You can refine it later.
+                </Text>
+              </View>
+
+              <View style={styles.selectionPill}>
+                <Text style={styles.selectionPillText}>Income source: {capitalize(incomeType) || 'Not set'}</Text>
+              </View>
+
+              <View style={styles.sliderCard}>
+                <View style={styles.sliderHeader}>
+                  <View style={styles.sliderIcon}>
+                    <Wallet size={18} color={PRIMARY} />
+                  </View>
+                  <Text style={styles.sliderLabel}>Estimated monthly income</Text>
+                </View>
+
+                <Text style={styles.amountText}>{income >= MAX_INCOME ? `${formatCurrency(MAX_INCOME)}+` : formatCurrency(income)}</Text>
+                <Text style={styles.amountHint}>Drag the slider to the closest amount</Text>
+
+                <View style={styles.trackContainer}>
+                  <View style={styles.trackBackground} />
+                  <Animated.View style={[styles.trackFill, { width: scrollX }]} />
+                  <Animated.View {...panResponder.panHandlers} style={[styles.thumb, { transform: [{ translateX: scrollX }] }]} />
+                </View>
+
+                <View style={styles.labelsContainer}>
+                  <Text style={styles.label}>{formatCurrency(0)}</Text>
+                  <Text style={styles.label}>{formatCurrency(100000)}</Text>
+                  <Text style={styles.label}>{formatCurrency(200000)}+</Text>
+                </View>
+              </View>
+
+              <View style={styles.buttonContainer}>
+                <PrimaryButton label="Continue" onPress={handleContinue} loading={loadingAction === 'continue'} disabled={!!loadingAction} />
+                <TouchableOpacity style={styles.skipButton} onPress={handleSkip} disabled={!!loadingAction} activeOpacity={0.8}>
+                  {loadingAction === 'skip' ? <ActivityIndicator size="small" color="#8A8A8A" /> : <Text style={styles.skipText}>Skip for now</Text>}
+                </TouchableOpacity>
+              </View>
+
+            </View>
           </View>
-
-          <View style={styles.trackContainer}>
-            <View style={styles.trackBackground} />
-            <Animated.View
-              style={[
-                styles.trackFill,
-                { width: scrollX }
-              ]}
-            />
-            <Animated.View
-              {...panResponder.panHandlers}
-              style={[
-                styles.thumb,
-                { transform: [{ translateX: scrollX }] }
-              ]}
-            />
-          </View>
-
-          <View style={styles.labelsContainer}>
-            <Text style={styles.label}>₹0</Text>
-            <Text style={styles.label}>₹1L</Text>
-            <Text style={styles.label}>₹2L+</Text>
-          </View>
         </View>
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.continueButton, loading && { opacity: 0.7 }]}
-            activeOpacity={0.8}
-            onPress={handleContinue}
-            disabled={loading}
-          >
-            <LinearGradient
-              colors={['#4F46E5', '#3730A3']}
-              style={styles.gradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              {loading ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text style={styles.continueText}>CONTINUE</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={handleSkip}
-            disabled={loading}
-          >
-            <Text style={styles.skipText}>SKIP</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </SafeAreaView>
+      </Screen>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  fullscreen: {
+    flex: 1,
+    backgroundColor: '#083368',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#083368',
   },
   container: {
     flex: 1,
-    padding: SPACING.lg,
   },
-  header: {
-    marginTop: SPACING.xl * 2,
-    marginBottom: SPACING.xl,
+  spacer: {
+    flex: 1, 
   },
-  question: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: COLORS.textDark,
-    marginBottom: SPACING.sm,
+  bottomCard: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    paddingTop: 24, 
+    paddingBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 10,
+    width: '100%',
   },
-  subQuestion: {
-    fontSize: 16,
-    color: COLORS.textMedium,
-    lineHeight: 22,
+  cardContent: {
+    paddingHorizontal: 20, 
   },
-  sliderContainer: {
-    marginTop: SPACING.xl * 2,
+  titleContainer: {
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
+    marginBottom: 20, 
   },
-  amountDisplay: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: SPACING.xl * 2,
-  },
-  currencySymbol: {
-    fontSize: 24,
+  eyebrow: {
+    fontSize: 11,
     fontWeight: '700',
-    color: COLORS.primary,
-    marginRight: 4,
+    color: PRIMARY,
+    letterSpacing: 1.2,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  title: {
+    fontSize: 22, 
+    fontWeight: '800',
+    color: '#1A1A1A',
+    lineHeight: 28,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 13, 
+    color: '#8A8A8A',
+    lineHeight: 20,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  selectionPill: {
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#F0F4F8',
+    marginBottom: 20,
+  },
+  selectionPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
+  sliderCard: {
+    padding: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
+  },
+  sliderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sliderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: BG_COLOR,
+    marginRight: 12,
+  },
+  sliderLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1A1A1A',
   },
   amountText: {
-    fontSize: 48,
+    fontSize: 38,
+    lineHeight: 46,
     fontWeight: '800',
-    color: COLORS.textDark,
+    color: '#1A1A1A',
   },
-  plusSign: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginLeft: 4,
+  amountHint: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#8A8A8A',
   },
   trackContainer: {
     width: SLIDER_WIDTH,
     height: 40,
     justifyContent: 'center',
+    marginTop: 20,
+    alignSelf: 'center',
   },
   trackBackground: {
     width: '100%',
     height: 12,
     backgroundColor: '#E2E8F0',
-    borderRadius: 6,
+    borderRadius: 999,
   },
   trackFill: {
-    height: 12,
-    backgroundColor: COLORS.primary,
-    borderRadius: 6,
     position: 'absolute',
     left: 0,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: PRIMARY,
   },
   thumb: {
+    position: 'absolute',
+    left: -16,
     width: 32,
     height: 32,
     borderRadius: 16,
     backgroundColor: COLORS.white,
-    position: 'absolute',
-    left: -16,
-    ...SHADOW,
-    elevation: 5,
     borderWidth: 3,
-    borderColor: COLORS.primary,
+    borderColor: PRIMARY,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   labelsContainer: {
     width: SLIDER_WIDTH,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: SPACING.md,
+    alignSelf: 'center',
+    marginTop: 12,
   },
   label: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    fontWeight: '600',
-  },
-  footer: {
-    marginTop: 'auto',
-    alignItems: 'center',
-    paddingBottom: SPACING.xl,
-  },
-  continueButton: {
-    width: '100%',
-    height: 56,
-    borderRadius: BORDER_RADIUS.md,
-    overflow: 'hidden',
-    ...SHADOW,
-    elevation: 4,
-    marginBottom: SPACING.md,
-  },
-  gradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  continueText: {
-    color: COLORS.white,
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    color: '#8A8A8A',
+  },
+  buttonContainer: {
+    marginTop: 10,
   },
   skipButton: {
-    paddingVertical: SPACING.md,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
   },
   skipText: {
     fontSize: 14,
-    color: COLORS.textLight,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    color: '#8A8A8A',
   },
 });
 

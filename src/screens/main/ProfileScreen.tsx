@@ -1,43 +1,50 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { User, Phone, CheckCircle2, ChevronRight, LogOut, Wallet } from 'lucide-react-native';
-import { COLORS, SPACING, BORDER_RADIUS, GRADIENTS } from '../../utils/theme';
-import { authApi } from '../../services/api';
-import storage from '../../services/storage';
+import { CheckCircle2, ChevronRight, LogOut, Phone, TrendingUp, User, Wallet } from 'lucide-react-native';
 import Screen from '../../components/ui/Screen';
 import ElevatedCard from '../../components/ui/ElevatedCard';
+import PageHeader from '../../components/ui/PageHeader';
+import { COLORS, GRADIENTS, SPACING } from '../../utils/theme';
+import { authApi } from '../../services/api';
+import storage from '../../services/storage';
+import { capitalize, formatCurrency } from '../../utils/format';
 
 const ProfileScreen = () => {
   const [profile, setProfile] = useState<any>(null);
   const [phone, setPhone] = useState('');
   const [salary, setSalary] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [isEditingSalary, setIsEditingSalary] = useState(false);
   const [balance, setBalance] = useState('');
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [isEditingSalary, setIsEditingSalary] = useState(false);
   const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [loading, setLoading] = useState(false);
+
   const sanitizePhone = (value: string) => value.replace(/\D/g, '');
 
   const loadProfile = useCallback(async () => {
     try {
       const data = await storage.getUserProfile();
       setProfile(data);
-      if (data?.phone) setPhone(data.phone);
-      if (data?.monthly_income !== undefined) setSalary(data.monthly_income.toString());
+      if (data?.phone) {
+        setPhone(data.phone);
+      }
+      if (data?.monthly_income !== undefined) {
+        setSalary(String(data.monthly_income));
+      }
       if (data?.current_balance !== undefined && data?.current_balance !== null) {
-        setBalance(data.current_balance.toString());
+        setBalance(String(data.current_balance));
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to load profile data');
@@ -48,11 +55,14 @@ const ProfileScreen = () => {
     loadProfile();
   }, [loadProfile]);
 
-  const persistProfile = useCallback(async (patch: Record<string, any>) => {
-    const newProfile = { ...profile, ...patch };
-    await storage.setUserProfile(newProfile);
-    setProfile(newProfile);
-  }, [profile]);
+  const persistProfile = useCallback(
+    async (patch: Record<string, any>) => {
+      const newProfile = { ...profile, ...patch };
+      await storage.setUserProfile(newProfile);
+      setProfile(newProfile);
+    },
+    [profile],
+  );
 
   const handleUpdatePhone = async () => {
     const normalizedPhone = sanitizePhone(phone);
@@ -64,12 +74,15 @@ const ProfileScreen = () => {
     try {
       setLoading(true);
       const userId = profile?.id;
-      if (!userId) throw new Error('User ID missing');
+      if (!userId) {
+        throw new Error('User ID missing');
+      }
+
       await authApi.updateUserPhone(userId, normalizedPhone);
       await persistProfile({ phone: normalizedPhone });
       setPhone(normalizedPhone);
-      setIsEditing(false);
-      Alert.alert('Success', 'Phone number updated successfully!');
+      setIsEditingPhone(false);
+      Alert.alert('Success', 'Phone number updated successfully.');
     } catch (error) {
       Alert.alert('Error', 'Failed to update phone number');
     } finally {
@@ -87,21 +100,24 @@ const ProfileScreen = () => {
     try {
       setLoading(true);
       const userId = profile?.id;
-      if (!userId) throw new Error('User ID missing');
+      if (!userId) {
+        throw new Error('User ID missing');
+      }
+
       await authApi.updateUserSalary(userId, salaryNum);
       await persistProfile({ monthly_income: salaryNum });
       setSalary(String(salaryNum));
       setIsEditingSalary(false);
-      Alert.alert('Success', 'Salary updated successfully!');
+      Alert.alert('Success', 'Salary updated successfully.');
     } catch (error) {
       Alert.alert('Error', 'Failed to update salary');
     } finally {
       setLoading(false);
     }
   };
+
   const handleUpdateBalance = async () => {
     const balanceNum = Number(balance.trim());
-
     if (isNaN(balanceNum) || balanceNum < 0) {
       Alert.alert('Error', 'Please enter a valid balance');
       return;
@@ -110,168 +126,192 @@ const ProfileScreen = () => {
     try {
       setLoading(true);
       const userId = profile?.id;
-      if (!userId) throw new Error('User ID missing');
+      if (!userId) {
+        throw new Error('User ID missing');
+      }
+
       await authApi.updateUserBalance(userId, balanceNum);
       await persistProfile({ current_balance: balanceNum });
       setBalance(String(balanceNum));
       setIsEditingBalance(false);
-      Alert.alert('Success', 'Balance updated successfully!');
+      Alert.alert('Success', 'Balance updated successfully.');
     } catch (error) {
       Alert.alert('Error', 'Failed to update balance');
     } finally {
       setLoading(false);
     }
   };
+
   const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to logout? This will clear your experimental data.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Logout', style: 'destructive', onPress: async () => {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
           try {
             await storage.clear();
           } catch (error) {
             Alert.alert('Error', 'Logout failed. Please try again.');
           }
-          // In a real app, you'd navigate back to splash or onboarding
-          // navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
-        }
-      }
+        },
+      },
     ]);
+  };
+
+  const currentBalanceDisplay =
+    profile?.current_balance !== undefined && profile?.current_balance !== null ? formatCurrency(profile.current_balance) : 'Not set';
+  const monthlyIncomeDisplay =
+    profile?.monthly_income !== undefined && profile?.monthly_income !== null ? formatCurrency(profile.monthly_income) : 'Not set';
+  const incomeSourceDisplay = capitalize(profile?.incomeType) || 'Not set';
+
+  const renderEditableValue = (
+    value: string,
+    isEditing: boolean,
+    onChangeText: (text: string) => void,
+    onSave: () => void,
+    onStartEdit: () => void,
+    keyboardType: 'default' | 'numeric' | 'phone-pad' = 'default',
+    displayValue?: string,
+  ) => {
+    if (isEditing) {
+      return (
+        <View style={styles.inlineEditor}>
+          <TextInput
+            style={styles.inlineInput}
+            value={value}
+            onChangeText={onChangeText}
+            keyboardType={keyboardType}
+            autoFocus
+            placeholderTextColor={COLORS.textLight}
+          />
+          <TouchableOpacity onPress={onSave} style={styles.inlineAction} activeOpacity={0.8}>
+            {loading ? <ActivityIndicator size="small" color={COLORS.primary} /> : <CheckCircle2 size={18} color={COLORS.income} />}
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity onPress={onStartEdit} activeOpacity={0.8}>
+        <Text style={styles.fieldValue}>{displayValue || value || 'Not set'}</Text>
+      </TouchableOpacity>
+    );
   };
 
   return (
     <Screen safeAreaStyle={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.headerTitle}>Profile</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+          <PageHeader eyebrow="Account" title="Profile" subtitle="Keep your finance identity clean and up to date." containerStyle={styles.header} />
 
-          {/* User Header */}
-          <ElevatedCard style={styles.profileHeader}>
-            <LinearGradient colors={GRADIENTS.primary} style={styles.avatar}>
-              <User color={COLORS.white} size={40} />
-            </LinearGradient>
-            <View style={styles.headerText}>
-              <Text style={styles.userName}>{profile?.name || 'Sufi Turab'}</Text>
-              <Text style={styles.userRole}>Premium Member</Text>
+          <LinearGradient colors={GRADIENTS.primary} style={styles.heroCard}>
+            <View style={styles.avatar}>
+              <User size={28} color={COLORS.primaryDark} />
+            </View>
+            <Text style={styles.heroName}>{profile?.name || 'Finance Member'}</Text>
+            <Text style={styles.heroSubtext}>{profile?.phone || 'Phone not added yet'}</Text>
+
+            <View style={styles.heroPills}>
+              <View style={styles.heroPill}>
+                <Text style={styles.heroPillText}>{profile?.monthly_income ? 'Income ready' : 'Income pending'}</Text>
+              </View>
+              <View style={styles.heroPill}>
+                <Text style={styles.heroPillText}>{profile?.current_balance ? 'Balance ready' : 'Balance pending'}</Text>
+              </View>
+            </View>
+          </LinearGradient>
+
+          <ElevatedCard style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Financial profile</Text>
+
+            <View style={styles.fieldRow}>
+              <View style={styles.fieldIconWrap}>
+                <Wallet size={18} color={COLORS.primary} />
+              </View>
+              <View style={styles.fieldCopy}>
+                <Text style={styles.fieldLabel}>Current balance</Text>
+                {renderEditableValue(
+                  balance,
+                  isEditingBalance,
+                  setBalance,
+                  handleUpdateBalance,
+                  () => setIsEditingBalance(true),
+                  'numeric',
+                  currentBalanceDisplay,
+                )}
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.fieldRow}>
+              <View style={styles.fieldIconWrap}>
+                <TrendingUp size={18} color={COLORS.primary} />
+              </View>
+              <View style={styles.fieldCopy}>
+                <Text style={styles.fieldLabel}>Monthly income</Text>
+                {renderEditableValue(
+                  salary,
+                  isEditingSalary,
+                  setSalary,
+                  handleUpdateSalary,
+                  () => setIsEditingSalary(true),
+                  'numeric',
+                  monthlyIncomeDisplay,
+                )}
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.fieldRow}>
+              <View style={styles.fieldIconWrap}>
+                <User size={18} color={COLORS.primary} />
+              </View>
+              <View style={styles.fieldCopy}>
+                <Text style={styles.fieldLabel}>Income source</Text>
+                <Text style={styles.fieldValue}>{incomeSourceDisplay}</Text>
+              </View>
             </View>
           </ElevatedCard>
 
-          {/* Stats Section */}
-          <View style={styles.statsRow}>
-            <ElevatedCard style={styles.statBox}>
-              <Wallet size={20} color={COLORS.primary} />
-              {isEditingBalance ? (
-                <View style={styles.editSalaryRow}>
-                  <TextInput
-                    style={styles.salaryInput}
-                    value={balance}
-                    onChangeText={setBalance}
-                    keyboardType="numeric"
-                    autoFocus
-                  />
-                  <TouchableOpacity onPress={handleUpdateBalance}>
-                    {loading ? <ActivityIndicator size="small" /> : <CheckCircle2 size={20} color={COLORS.income} />}
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity onPress={() => setIsEditingBalance(true)}>
-                  <Text style={styles.statValue}>
-                    ₹{(profile?.current_balance || 0).toLocaleString()}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              <Text style={styles.statLabel}>Current Balance</Text>
-            </ElevatedCard>
-            <ElevatedCard style={styles.statBox}>
-              {isEditingSalary ? (
-                <View style={styles.editSalaryRow}>
-                  <TextInput
-                    style={styles.salaryInput}
-                    value={salary}
-                    onChangeText={setSalary}
-                    keyboardType="numeric"
-                    autoFocus
-                  />
-                  <TouchableOpacity onPress={handleUpdateSalary}>
-                    {loading ? <ActivityIndicator size="small" color={COLORS.primary} /> : <CheckCircle2 size={20} color={COLORS.income} />}
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity onPress={() => setIsEditingSalary(true)}>
-                  <Text style={styles.statValue}>₹{(profile?.monthly_income || 0).toLocaleString()}</Text>
-                </TouchableOpacity>
-              )}
-              <Text style={styles.statLabel}>Monthly Income</Text>
-            </ElevatedCard>
-            <ElevatedCard style={styles.statBox}>
-              <Text style={styles.statValue}>{profile?.incomeType || 'Salary'}</Text>
-              <Text style={styles.statLabel}>Source</Text>
-            </ElevatedCard>
-          </View>
+          <ElevatedCard style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Contact information</Text>
 
-          {/* Info Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact Information</Text>
-
-            <ElevatedCard style={styles.infoCard}>
-              <View style={styles.infoRow}>
-                <View style={styles.iconCircle}>
-                  <Phone size={20} color={COLORS.primary} />
-                </View>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Phone Number</Text>
-                  {isEditing ? (
-                    <TextInput
-                      style={styles.input}
-                      value={phone}
-                      onChangeText={setPhone}
-                      keyboardType="phone-pad"
-                      autoFocus
-                    />
-                  ) : (
-                    <Text style={styles.infoValue}>{profile?.phone || 'Not set'}</Text>
-                  )}
-                </View>
-
-                {isEditing ? (
-                  <TouchableOpacity onPress={handleUpdatePhone}>
-                    {loading ? <ActivityIndicator size="small" color={COLORS.primary} /> : <CheckCircle2 size={24} color={COLORS.income} />}
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity onPress={() => setIsEditing(true)}>
-                    <Text style={styles.editText}>Change</Text>
-                  </TouchableOpacity>
-                )}
+            <View style={styles.fieldRow}>
+              <View style={styles.fieldIconWrap}>
+                <Phone size={18} color={COLORS.primary} />
               </View>
-            </ElevatedCard>
-          </View>
+              <View style={styles.fieldCopy}>
+                <Text style={styles.fieldLabel}>Phone number</Text>
+                {renderEditableValue(phone, isEditingPhone, setPhone, handleUpdatePhone, () => setIsEditingPhone(true), 'phone-pad', profile?.phone || 'Not set')}
+              </View>
+            </View>
+          </ElevatedCard>
 
-          {/* Settings Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>App Settings</Text>
-            <ElevatedCard style={styles.settingsItem}>
-              <TouchableOpacity style={styles.settingsItemContent}>
-              <Text style={styles.settingsLabel}>Notifications</Text>
-              <ChevronRight size={20} color={COLORS.textLight} />
-              </TouchableOpacity>
-            </ElevatedCard>
-            <ElevatedCard style={styles.settingsItem}>
-              <TouchableOpacity style={styles.settingsItemContent}>
-              <Text style={styles.settingsLabel}>Privacy Policy</Text>
-              <ChevronRight size={20} color={COLORS.textLight} />
-              </TouchableOpacity>
-            </ElevatedCard>
-            <ElevatedCard style={styles.settingsItem}>
-              <TouchableOpacity style={styles.settingsItemContent} onPress={handleLogout}>
-              <Text style={[styles.settingsLabel, { color: COLORS.expense }]}>Logout</Text>
-              <LogOut size={20} color={COLORS.expense} />
-              </TouchableOpacity>
-            </ElevatedCard>
-          </View>
+          <ElevatedCard style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>App settings</Text>
 
+            <TouchableOpacity style={styles.settingRow} activeOpacity={0.8}>
+              <Text style={styles.settingLabel}>Notifications</Text>
+              <ChevronRight size={18} color={COLORS.textLight} />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity style={styles.settingRow} activeOpacity={0.8}>
+              <Text style={styles.settingLabel}>Privacy policy</Text>
+              <ChevronRight size={18} color={COLORS.textLight} />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity style={styles.settingRow} activeOpacity={0.8} onPress={handleLogout}>
+              <Text style={[styles.settingLabel, { color: COLORS.expense }]}>Logout</Text>
+              <LogOut size={18} color={COLORS.expense} />
+            </TouchableOpacity>
+          </ElevatedCard>
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
@@ -283,158 +323,143 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  flex: {
+    flex: 1,
+  },
   container: {
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.xl,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.textDark,
-    marginBottom: SPACING.xl,
+  header: {
+    paddingHorizontal: 0,
   },
-  profileHeader: {
-    flexDirection: 'row',
+  heroCard: {
+    marginTop: SPACING.xl,
+    borderRadius: 28,
+    padding: SPACING.xl,
     alignItems: 'center',
-    marginBottom: SPACING.xl,
-    padding: SPACING.lg,
-    elevation: 4,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
+    width: 74,
+    height: 74,
+    borderRadius: 24,
     alignItems: 'center',
-    marginRight: SPACING.lg,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.78)',
   },
-  headerText: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 22,
+  heroName: {
+    marginTop: SPACING.lg,
+    fontSize: 24,
     fontWeight: '800',
-    color: COLORS.textDark,
+    color: COLORS.white,
   },
-  userRole: {
+  heroSubtext: {
+    marginTop: SPACING.sm,
     fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: '600',
-    marginTop: 2,
+    color: 'rgba(255,255,255,0.82)',
   },
-  statsRow: {
+  heroPills: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'stretch',
-    marginBottom: SPACING.xl,
-  },
-  statBox: {
-    width: '31.5%',
-    minHeight: 132,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.sm,
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 2,
+    marginTop: SPACING.lg,
   },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textDark,
-    marginBottom: 4,
-    textAlign: 'center',
+  heroPill: {
+    marginHorizontal: 4,
+    marginBottom: 8,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
   },
-  statLabel: {
+  heroPillText: {
     fontSize: 12,
-    color: COLORS.textLight,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: '700',
+    color: COLORS.white,
   },
-  section: {
-    marginBottom: SPACING.xl,
+  sectionCard: {
+    marginTop: SPACING.lg,
+    padding: SPACING.lg,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: COLORS.textLight,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textDark,
     marginBottom: SPACING.md,
-    paddingLeft: SPACING.xs,
   },
-  infoCard: {
-    overflow: 'hidden',
-    elevation: 2,
-  },
-  infoRow: {
+  fieldRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
+    alignItems: 'flex-start',
   },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#EEF2FF',
-    justifyContent: 'center',
+  fieldIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySurface,
     marginRight: SPACING.md,
   },
-  infoContent: {
+  fieldCopy: {
     flex: 1,
   },
-  infoLabel: {
+  fieldLabel: {
     fontSize: 12,
-    color: COLORS.textLight,
-    marginBottom: 2,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textDark,
-  },
-  input: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textDark,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.primary,
-    paddingVertical: 2,
-  },
-  editText: {
-    fontSize: 14,
-    color: COLORS.primary,
     fontWeight: '700',
+    color: COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
   },
-  settingsItem: {
-    marginBottom: SPACING.sm,
-    elevation: 1,
+  fieldValue: {
+    marginTop: 6,
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textDark,
   },
-  settingsItemContent: {
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: SPACING.lg,
+  },
+  inlineEditor: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.sm,
+  },
+  inlineInput: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: SPACING.md,
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textDark,
+  },
+  inlineAction: {
+    marginLeft: SPACING.sm,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SPACING.lg,
   },
-  settingsLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textDark,
-  },
-  editSalaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  salaryInput: {
-    fontSize: 18,
+  settingLabel: {
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.textDark,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.primary,
-    marginRight: 8,
-    textAlign: 'center',
-    minWidth: 80,
-    paddingVertical: 0,
   },
 });
 

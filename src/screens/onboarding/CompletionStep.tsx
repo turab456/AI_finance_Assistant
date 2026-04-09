@@ -1,133 +1,241 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { COLORS, GRADIENTS, SPACING, BORDER_RADIUS, SHADOW } from '../../utils/theme';
+import React, { useState } from 'react';
+import { NativeModules, StyleSheet, Text, View, Image } from 'react-native';
+import { BellRing, CheckCircle2, Target, Wallet } from 'lucide-react-native';
+import Screen from '../../components/ui/Screen';
+import PrimaryButton from '../../components/ui/PrimaryButton';
+import { COLORS } from '../../utils/theme';
 import storage from '../../services/storage';
+import { capitalize } from '../../utils/format';
 
-const { width } = Dimensions.get('window');
+const PRIMARY = '#09356B';
+const BG_COLOR = '#F1F5F9';
 
 const CompletionStep = ({ navigation, route }: any) => {
   const { incomeType, incomeRange, spendingGoal } = route?.params || {};
+  const [loading, setLoading] = useState(false);
 
   const handleFinish = async () => {
-    const userProfile = { incomeType, incomeRange, spendingGoal, createdAt: new Date().toISOString() };
-    await storage.setUserProfile(userProfile);
-    await storage.setOnboardingCompleted(true);
-    
-    import('react-native').then(({ NativeModules }) => {
-        const { NotificationPermissionModule } = NativeModules;
-        if (NotificationPermissionModule) {
-            NotificationPermissionModule.isNotificationServiceEnabled().then((isEnabled: boolean) => {
-                if (isEnabled) {
-                    navigation.replace('Main');
-                } else {
-                    navigation.replace('NotificationPermission');
-                }
-            });
-        } else {
-            navigation.replace('Main');
-        }
-    });
+    try {
+      setLoading(true);
+      const existingProfile = (await storage.getUserProfile()) || {};
+
+      await storage.setUserProfile({
+        ...existingProfile,
+        incomeType: incomeType || existingProfile.incomeType || 'not_set',
+        incomeRange: incomeRange ?? existingProfile.incomeRange ?? null,
+        spendingGoal: spendingGoal || existingProfile.spendingGoal || null,
+        createdAt: existingProfile.createdAt || new Date().toISOString(),
+      });
+      await storage.setOnboardingCompleted(true);
+
+      const { NotificationPermissionModule } = NativeModules;
+      if (NotificationPermissionModule) {
+        const isEnabled = await NotificationPermissionModule.isNotificationServiceEnabled();
+        navigation.replace(isEnabled ? 'Main' : 'NotificationPermission');
+        return;
+      }
+
+      navigation.replace('Main');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.content}>
-            <View style={styles.iconContainer}>
-              <LinearGradient colors={GRADIENTS.income} style={styles.circle}>
-                  <Text style={styles.checkIcon}>✓</Text>
-              </LinearGradient>
-            </View>
-          <Text style={styles.title}>Setup complete</Text>
-          <Text style={styles.subtitle}>
-              Your finance advisor is ready! We'll now start tracking your spending through notifications.
-          </Text>
-        </View>
+    <View style={styles.fullscreen}>
+      <Image 
+        source={require('../../assets/welcomeimg.jpg')} 
+        style={styles.backgroundImage} 
+        resizeMode="cover" 
+      />
 
-        <View style={styles.footer}>
-          <TouchableOpacity 
-            style={styles.button}
-            activeOpacity={0.8}
-            onPress={handleFinish}
-          >
-            <LinearGradient 
-              colors={GRADIENTS.primary} 
-              style={styles.buttonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Text style={styles.buttonText}>Go to Dashboard</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+      <Screen safeAreaStyle={styles.safeArea} withContentWrapper={false}>
+        <View style={styles.container}>
+          
+          <View style={styles.spacer} />
+
+          <View style={styles.bottomCard}>
+            <View style={styles.cardContent}>
+              
+              <View style={styles.titleContainer}>
+                <View style={styles.heroBadge}>
+                  <CheckCircle2 size={32} color={PRIMARY} />
+                </View>
+                <Text style={styles.eyebrow}>ALL DONE</Text>
+                <Text style={styles.title}>Your dashboard is ready</Text>
+                <Text style={styles.subtitle}>
+                  Everything is set for cleaner tracking. You can tweak these targets later from the Profile screen at any time.
+                </Text>
+              </View>
+
+              <View style={styles.listContainer}>
+                
+                <View style={styles.summaryRow}>
+                  <View style={styles.iconContainer}>
+                    <Wallet size={18} color={PRIMARY} />
+                  </View>
+                  <View style={styles.summaryCopy}>
+                    <Text style={styles.summaryLabel}>Income source</Text>
+                    <Text style={styles.summaryValue}>{capitalize(incomeType) || 'Not set'}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.summaryRow}>
+                  <View style={styles.iconContainer}>
+                    <BellRing size={18} color={PRIMARY} />
+                  </View>
+                  <View style={styles.summaryCopy}>
+                    <Text style={styles.summaryLabel}>Income amount</Text>
+                    <Text style={styles.summaryValue}>{incomeRange || 'Set later'}</Text>
+                  </View>
+                </View>
+
+                <View style={[styles.summaryRow, styles.summaryRowLast]}>
+                  <View style={styles.iconContainer}>
+                    <Target size={18} color={PRIMARY} />
+                  </View>
+                  <View style={styles.summaryCopy}>
+                    <Text style={styles.summaryLabel}>Primary focus</Text>
+                    <Text style={styles.summaryValue}>{capitalize(spendingGoal?.replace('_', ' ')) || 'Not set'}</Text>
+                  </View>
+                </View>
+
+              </View>
+
+              <View style={styles.buttonContainer}>
+                <PrimaryButton 
+                  label="Open dashboard" 
+                  onPress={handleFinish} 
+                  loading={loading}
+                  disabled={loading}
+                />
+              </View>
+
+            </View>
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </Screen>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  fullscreen: {
+    flex: 1,
+    backgroundColor: '#083368',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
-    padding: SPACING.lg,
-    justifyContent: 'center',
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
+  spacer: {
+    flex: 1, 
+  },
+  bottomCard: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    paddingTop: 24, 
+    paddingBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 10,
+    width: '100%',
+  },
+  cardContent: {
+    paddingHorizontal: 20, 
+  },
+  titleContainer: {
     alignItems: 'center',
+    marginBottom: 8, 
   },
-  iconContainer: {
-    marginBottom: SPACING.xl,
-  },
-  circle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
+  heroBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: BG_COLOR,
     alignItems: 'center',
-    ...SHADOW,
+    justifyContent: 'center',
+    marginBottom: 16,
   },
-  checkIcon: {
-    fontSize: 40,
-    color: COLORS.white,
-    fontWeight: 'bold',
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: PRIMARY,
+    letterSpacing: 1.2,
+    marginBottom: 8,
+    textAlign: 'center',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.textDark,
+    fontSize: 22, 
+    fontWeight: '800',
+    color: '#1A1A1A',
+    lineHeight: 28,
+    marginBottom: 6,
     textAlign: 'center',
-    marginBottom: SPACING.md,
   },
   subtitle: {
-    fontSize: 16,
-    color: COLORS.textMedium,
+    fontSize: 13, 
+    color: '#8A8A8A',
+    lineHeight: 20,
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: 8,
   },
-  footer: {
-    paddingBottom: SPACING.lg,
+  listContainer: {
+    paddingTop: 8,
+    paddingBottom: 8,
   },
-  button: {
-    borderRadius: BORDER_RADIUS.md,
-    overflow: 'hidden',
-    ...SHADOW,
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
-  buttonGradient: {
-    paddingVertical: 18,
+  summaryRowLast: {
+    borderBottomWidth: 0,
+  },
+  iconContainer: {
+    width: 44, 
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: BG_COLOR,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 16,
   },
-  buttonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '600',
+  summaryCopy: {
+    flex: 1,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8A8A8A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  summaryValue: {
+    marginTop: 4,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1A1A1A',
+  },
+  buttonContainer: {
+    marginTop: 10,
   },
 });
 

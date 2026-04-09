@@ -1,96 +1,100 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { COLORS, GRADIENTS, SPACING, BORDER_RADIUS, SHADOW } from '../../utils/theme';
+import { StyleSheet, Text, View, Image } from 'react-native';
+import Screen from '../../components/ui/Screen';
+import PrimaryButton from '../../components/ui/PrimaryButton';
+import { COLORS } from '../../utils/theme';
 
-const WelcomeStep = ({ navigation, onNext }: any) => {
-  return (
-    <SafeAreaView style={styles.safeArea}>
+const WelcomeStep = ({ navigation }: any) => (
+  <View style={styles.fullscreen}>
+    {/* Full Screen Background Image */}
+    <Image
+      source={require('../../assets/welcomeimg.jpg')}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    />
+
+    <Screen safeAreaStyle={styles.safeArea} withContentWrapper={false}>
       <View style={styles.container}>
-        <View style={styles.header}>
-            <LinearGradient colors={GRADIENTS.primary} style={styles.circle} />
-        </View>
+        {/* Fill the top space so bottom card stays at bottom */}
+        <View style={styles.spacer} />
 
-        <View style={styles.content}>
-          <Text style={styles.title}>Let’s set up your finance profile</Text>
-          <Text style={styles.subtitle}>Our AI-powered engine will help you track and save automatically.</Text>
-        </View>
+        {/* Bottom Card (Full Width and attached to bottom) */}
+        <View style={styles.bottomCard}>
+          <View style={styles.textContainer}>
+            <Text style={styles.title}>Manage your daily{'\n'}life expenses</Text>
+            <Text style={styles.subtitle}>
+              Expense Tracker is a simple and efficient personal finance management app that allows you to track your daily expenses and income.
+            </Text>
+          </View>
 
-        <View style={styles.footer}>
-          <TouchableOpacity 
-            style={styles.button}
-            activeOpacity={0.8}
+          {/* CTA Button */}
+          <PrimaryButton
+            label="Get started"
             onPress={() => navigation.navigate('IncomeType')}
-          >
-            <LinearGradient 
-              colors={GRADIENTS.primary} 
-              style={styles.buttonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Text style={styles.buttonText}>Start (30 sec setup)</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          />
         </View>
       </View>
-    </SafeAreaView>
-  );
-};
+    </Screen>
+  </View>
+);
 
 const styles = StyleSheet.create({
+  fullscreen: {
+    flex: 1,
+    backgroundColor: '#FDF1D1', // Fallback background color matching the image
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
-    padding: SPACING.lg,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
-  header: {
-    alignItems: 'center',
-    marginTop: SPACING.xxl,
-  },
-  circle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  content: {
+  spacer: {
     flex: 1,
-    justifyContent: 'center',
+  },
+  bottomCard: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    paddingHorizontal: 32,
+    paddingTop: 48,
+    paddingBottom: 48, // ample bottom padding
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 10,
+    width: '100%',
+  },
+  textContainer: {
     alignItems: 'center',
+    marginBottom: 40,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.textDark,
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#1A1A1A',
     textAlign: 'center',
-    marginBottom: SPACING.md,
+    lineHeight: 38,
+    marginBottom: 16,
   },
   subtitle: {
-    fontSize: 16,
-    color: COLORS.textMedium,
+    fontSize: 14,
+    color: '#8A8A8A',
     textAlign: 'center',
-    lineHeight: 24,
-  },
-  footer: {
-    paddingBottom: SPACING.lg,
-  },
-  button: {
-    borderRadius: BORDER_RADIUS.md,
-    overflow: 'hidden',
-    ...SHADOW,
-  },
-  buttonGradient: {
-    paddingVertical: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '600',
+    lineHeight: 22,
+    paddingHorizontal: 12,
   },
 });
 

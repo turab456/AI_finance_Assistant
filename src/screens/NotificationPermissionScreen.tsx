@@ -1,43 +1,58 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  SafeAreaView, 
-  AppState,
-  NativeModules
-} from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { BellRing } from 'lucide-react-native';
-import { COLORS, GRADIENTS, SPACING, BORDER_RADIUS, SHADOW } from '../utils/theme';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AppState, NativeModules, StyleSheet, Text, TouchableOpacity, View, Image, ScrollView, Alert } from 'react-native';
+import { BellRing, ChevronRight, ShieldCheck } from 'lucide-react-native';
+import Screen from '../components/ui/Screen';
+import PrimaryButton from '../components/ui/PrimaryButton';
+import { COLORS } from '../utils/theme';
 
 const { NotificationPermissionModule } = NativeModules;
+
+const STEPS = [
+  'Tap the button below to open Android notification settings.',
+  'Find and select AI Finance Assistant in the list.',
+  'Enable notification access, then return to the app.',
+];
+
+const PRIMARY = '#09356B';
+const BG_COLOR = '#F1F5F9';
 
 const NotificationPermissionScreen = ({ navigation }: any) => {
   const [appState, setAppState] = useState(AppState.currentState);
 
+  const checkPermissionAndNavigate = useCallback(async () => {
+    if (!NotificationPermissionModule) {
+      navigation.replace('Main');
+      return;
+    }
+
+    const isEnabled = await NotificationPermissionModule.isNotificationServiceEnabled();
+    if (isEnabled) {
+      navigation.replace('Main');
+    } else {
+      Alert.alert(
+        "Permission not detected",
+        "We couldn't automatically verify that notification access is enabled.",
+        [
+          { text: "Check again", style: "cancel" },
+          { text: "Proceed anyway", onPress: () => navigation.replace('Main') }
+        ]
+      );
+    }
+  }, [navigation]);
+
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async nextAppState => {
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
-        checkPermissionAndNavigate();
+        await checkPermissionAndNavigate();
       }
+
       setAppState(nextAppState);
     });
 
     return () => {
       subscription.remove();
     };
-  }, [appState]);
-
-  const checkPermissionAndNavigate = async () => {
-    if (NotificationPermissionModule) {
-      const isEnabled = await NotificationPermissionModule.isNotificationServiceEnabled();
-      if (isEnabled) {
-        navigation.replace('Main');
-      }
-    }
-  };
+  }, [appState, checkPermissionAndNavigate]);
 
   const handleOpenSettings = () => {
     if (NotificationPermissionModule) {
@@ -46,128 +61,230 @@ const NotificationPermissionScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.content}>
-          <View style={styles.iconContainer}>
-            <LinearGradient colors={['#EEF2FF', '#E0E7FF']} style={styles.circle}>
-              <BellRing size={40} color={COLORS.primary} fill={COLORS.primary} />
-            </LinearGradient>
-          </View>
-          
-          <Text style={styles.title}>Notification Access</Text>
-          <Text style={styles.subtitle}>
-            To track your expenses automatically, please allow access to notifications from your bank apps.
-          </Text>
-          <View style={styles.instructionBox}>
-             <Text style={styles.instructionText}>
-                1. Tap the button below to open Settings.
-             </Text>
-             <Text style={styles.instructionText}>
-                2. Find and select AI Finance Assistant.
-             </Text>
-             <Text style={styles.instructionText}>
-                3. Toggle the switch to "Allow notification access".
-             </Text>
-          </View>
-        </View>
+    <View style={styles.fullscreen}>
+      <Image 
+        source={require('../assets/welcomeimg.jpg')} 
+        style={styles.backgroundImage} 
+        resizeMode="cover" 
+      />
 
-        <View style={styles.footer}>
-          <TouchableOpacity 
-            style={styles.button}
-            activeOpacity={0.8}
-            onPress={handleOpenSettings}
-          >
-            <LinearGradient 
-              colors={GRADIENTS.primary} 
-              style={styles.buttonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+      <Screen safeAreaStyle={styles.safeArea} withContentWrapper={false}>
+        <View style={styles.container}>
+          
+          <View style={styles.spacer} />
+
+          <View style={styles.bottomCard}>
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.cardContent}
+              bounces={true}
             >
-              <Text style={styles.buttonText}>Open Settings</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              
+              <View style={styles.titleContainer}>
+                <View style={styles.heroBadge}>
+                  <BellRing size={32} color={PRIMARY} />
+                </View>
+                <Text style={styles.eyebrow}>CRITICAL STEP</Text>
+                <Text style={styles.title}>Enable notifications</Text>
+                <Text style={styles.subtitle}>
+                  This keeps tracking automatic by letting the assistant read your verified bank alerts quietly in the background.
+                </Text>
+              </View>
+
+              <View style={styles.infoBox}>
+                <View style={styles.infoHeader}>
+                  <ShieldCheck size={18} color={PRIMARY} />
+                  <Text style={styles.infoTitle}>Why this matters</Text>
+                </View>
+                <Text style={styles.infoBody}>
+                  Once enabled, the app captures spending data frictionlessly and keeps your trends perfectly accurate without any manual entry.
+                </Text>
+              </View>
+
+              <View style={styles.stepsContainer}>
+                <Text style={styles.stepsTitle}>Quick setup</Text>
+                {STEPS.map((step, index) => (
+                  <View key={step} style={[styles.stepRow, index === STEPS.length - 1 && styles.stepRowLast]}>
+                    <View style={styles.stepIndex}>
+                      <Text style={styles.stepIndexText}>{index + 1}</Text>
+                    </View>
+                    <Text style={styles.stepText}>{step}</Text>
+                    <ChevronRight size={18} color={PRIMARY} />
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.buttonContainer}>
+                <PrimaryButton label="Open Settings" onPress={handleOpenSettings} />
+                <TouchableOpacity style={styles.secondaryAction} onPress={checkPermissionAndNavigate} activeOpacity={0.8}>
+                  <Text style={styles.secondaryActionText}>I already enabled it</Text>
+                </TouchableOpacity>
+              </View>
+
+            </ScrollView>
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </Screen>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  fullscreen: {
+    flex: 1,
+    backgroundColor: '#083368',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#083368',
   },
   container: {
     flex: 1,
-    padding: SPACING.lg,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
+  spacer: {
+    flex: 0.15, 
+  },
+  bottomCard: {
+    flex: 0.85, 
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    paddingTop: 24, 
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 10,
+    width: '100%',
+  },
+  cardContent: {
+    paddingHorizontal: 20, 
+    paddingBottom: 32,
+  },
+  titleContainer: {
     alignItems: 'center',
+    marginBottom: 20, 
   },
-  iconContainer: {
-    marginBottom: SPACING.xl,
-  },
-  circle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: 'center',
+  heroBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: BG_COLOR,
     alignItems: 'center',
-    ...SHADOW,
-    elevation: 4,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: PRIMARY,
+    letterSpacing: 1.2,
+    marginBottom: 8,
+    textAlign: 'center',
   },
   title: {
-    fontSize: 26,
+    fontSize: 22, 
     fontWeight: '800',
-    color: COLORS.textDark,
+    color: '#1A1A1A',
+    lineHeight: 28,
+    marginBottom: 6,
     textAlign: 'center',
-    marginBottom: SPACING.md,
   },
   subtitle: {
-    fontSize: 16,
-    color: COLORS.textMedium,
+    fontSize: 13, 
+    color: '#8A8A8A',
+    lineHeight: 20,
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.xl,
+    paddingHorizontal: 8,
   },
-  instructionBox: {
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.lg,
-    width: '100%',
-    ...SHADOW,
-    elevation: 2,
+  infoBox: {
+    backgroundColor: BG_COLOR,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
   },
-  instructionText: {
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  infoTitle: {
+    marginLeft: 8,
     fontSize: 15,
-    color: COLORS.textDark,
-    marginBottom: SPACING.sm,
-    fontWeight: '500',
-    lineHeight: 22,
+    fontWeight: '700',
+    color: PRIMARY,
   },
-  footer: {
-    paddingBottom: SPACING.lg,
+  infoBody: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#64748B', 
   },
-  button: {
-    width: '100%',
-    borderRadius: BORDER_RADIUS.md,
-    overflow: 'hidden',
-    ...SHADOW,
-    elevation: 4,
+  stepsContainer: {
+    paddingHorizontal: 4,
   },
-  buttonGradient: {
-    paddingVertical: 18,
+  stepsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  stepRowLast: {
+    borderBottomWidth: 0,
+  },
+  stepIndex: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: PRIMARY,
+    marginRight: 12,
   },
-  buttonText: {
-    color: COLORS.white,
-    fontSize: 18,
+  stepIndexText: {
+    fontSize: 12,
     fontWeight: '700',
+    color: COLORS.white,
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#1A1A1A',
+    marginRight: 8,
+  },
+  buttonContainer: {
+    marginTop: 24,
+  },
+  secondaryAction: {
+    marginTop: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: COLORS.white,
+  },
+  secondaryActionText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#8A8A8A',
   },
 });
 

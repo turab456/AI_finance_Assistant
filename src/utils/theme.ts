@@ -16,6 +16,9 @@ export const COLORS = {
 
   background: '#F8FAFC',
   card: '#FFFFFF',
+  surface: '#F1F5F9',
+  border: '#E2E8F0',
+  primarySurface: '#EEF2FF',
 
   textDark: '#1E293B',
   textMedium: '#64748B',
@@ -51,9 +54,9 @@ export const BORDER_RADIUS = {
 };
 
 export const SHADOW = {
-  elevation: 5,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 5,
+  elevation: 4,
+  shadowColor: '#0F172A',
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.06,
+  shadowRadius: 16,
 };

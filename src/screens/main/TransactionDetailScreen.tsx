@@ -1,49 +1,62 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
-import { ChevronLeft, Info } from 'lucide-react-native';
-import { COLORS, SPACING, BORDER_RADIUS } from '../../utils/theme';
+import { StyleSheet, Text, View } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import { Info, TrendingDown, TrendingUp } from 'lucide-react-native';
+import Screen from '../../components/ui/Screen';
+import ElevatedCard from '../../components/ui/ElevatedCard';
+import PageHeader from '../../components/ui/PageHeader';
+import { COLORS, SPACING } from '../../utils/theme';
 
 const TransactionDetailScreen = ({ navigation, route }: any) => {
   const { transaction } = route.params || {};
+  const isCredit = transaction?.type === 'credit';
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <ChevronLeft size={28} color={COLORS.textDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Details</Text>
-        <View style={{ width: 28 }} />
-      </View>
+    <Screen safeAreaStyle={styles.safeArea}>
+      <PageHeader
+        eyebrow="Details"
+        title={transaction?.merchant || 'Transaction'}
+        subtitle="Expanded category view for the selected activity."
+        onBack={() => navigation.goBack()}
+      />
 
-      <View style={styles.container}>
-        <View style={styles.card}>
-          <Text style={styles.merchant}>{transaction?.merchant}</Text>
-          <Text style={[styles.amount, { color: transaction?.type === 'credit' ? COLORS.income : COLORS.expense }]}>
-             {transaction?.amount}
-          </Text>
-          <Text style={styles.time}>{transaction?.time}</Text>
-          
-          <View style={styles.divider} />
-          
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Category</Text>
-            <Text style={styles.infoValue}>{transaction?.category}</Text>
-          </View>
+      <LinearGradient colors={isCredit ? ['#34D399', COLORS.incomeDark] : ['#FB7185', COLORS.expenseDark]} style={styles.heroCard}>
+        <View style={styles.heroIcon}>
+          {isCredit ? <TrendingUp size={24} color={isCredit ? COLORS.incomeDark : COLORS.expenseDark} /> : <TrendingDown size={24} color={COLORS.expenseDark} />}
         </View>
+        <Text style={styles.heroAmount}>{transaction?.amount || 'N/A'}</Text>
+        <Text style={styles.heroMeta}>{transaction?.time || 'Captured from notifications'}</Text>
+      </LinearGradient>
 
-        <View style={styles.aiCard}>
-          <View style={styles.aiHeader}>
-            <Info size={20} color={COLORS.primary} />
-            <Text style={styles.aiTitle}>AI Explanation</Text>
-          </View>
-          <Text style={styles.aiText}>
-            This transaction was detected from a {transaction?.merchant} notification. 
-            It has been categorized under {transaction?.category} based on historical spending patterns.
-          </Text>
+      <ElevatedCard style={styles.metaCard}>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaLabel}>Category</Text>
+          <Text style={styles.metaValue}>{transaction?.category || 'Not available'}</Text>
         </View>
-      </View>
-    </SafeAreaView>
+        <View style={styles.divider} />
+        <View style={styles.metaRow}>
+          <Text style={styles.metaLabel}>Direction</Text>
+          <Text style={styles.metaValue}>{isCredit ? 'Incoming' : 'Outgoing'}</Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.metaRow}>
+          <Text style={styles.metaLabel}>Source</Text>
+          <Text style={styles.metaValue}>Bank notification</Text>
+        </View>
+      </ElevatedCard>
+
+      <ElevatedCard style={styles.aiCard}>
+        <View style={styles.aiHeader}>
+          <View style={styles.aiIcon}>
+            <Info size={18} color={COLORS.primary} />
+          </View>
+          <Text style={styles.aiTitle}>AI explanation</Text>
+        </View>
+        <Text style={styles.aiText}>
+          This activity was grouped under {transaction?.category || 'the selected category'} using recent notification patterns and your existing monthly trend history.
+        </Text>
+      </ElevatedCard>
+    </Screen>
   );
 };
 
@@ -52,89 +65,88 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SPACING.lg,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textDark,
-  },
-  container: {
-    padding: SPACING.lg,
-  },
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
+  heroCard: {
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.xl,
+    borderRadius: 28,
     padding: SPACING.xl,
     alignItems: 'center',
-    marginBottom: SPACING.xl,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
   },
-  merchant: {
-    fontSize: 20,
+  heroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.82)',
+  },
+  heroAmount: {
+    marginTop: SPACING.lg,
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: '800',
+    color: COLORS.white,
+  },
+  heroMeta: {
+    marginTop: SPACING.sm,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.82)',
+  },
+  metaCard: {
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
+    padding: SPACING.lg,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  metaLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  metaValue: {
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.textDark,
-    marginBottom: SPACING.sm,
-  },
-  amount: {
-    fontSize: 32,
-    fontWeight: '800',
-    marginBottom: SPACING.md,
-  },
-  time: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    marginBottom: SPACING.xl,
   },
   divider: {
     height: 1,
-    backgroundColor: '#F1F5F9',
-    width: '100%',
-    marginBottom: SPACING.lg,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  infoLabel: {
-    color: COLORS.textLight,
-    fontWeight: '600',
-  },
-  infoValue: {
-    color: COLORS.textDark,
-    fontWeight: '700',
+    backgroundColor: COLORS.border,
+    marginVertical: SPACING.lg,
   },
   aiCard: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: BORDER_RADIUS.md,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
     padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
   },
   aiHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  aiIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySurface,
+    marginRight: SPACING.md,
   },
   aiTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: COLORS.primary,
-    marginLeft: SPACING.sm,
+    color: COLORS.textDark,
   },
   aiText: {
     fontSize: 14,
-    color: COLORS.textMedium,
     lineHeight: 22,
+    color: COLORS.textMedium,
   },
 });
 
