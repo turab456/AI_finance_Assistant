@@ -1,151 +1,100 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { BellRing, Sparkles, TrendingUp, Wallet } from 'lucide-react-native';
+import { StyleSheet, Text, View, Image } from 'react-native';
 import Screen from '../../components/ui/Screen';
-import ElevatedCard from '../../components/ui/ElevatedCard';
 import PrimaryButton from '../../components/ui/PrimaryButton';
-import { COLORS, GRADIENTS, SPACING } from '../../utils/theme';
+import { COLORS } from '../../utils/theme';
 
-const FEATURES = [
-  { icon: TrendingUp, title: 'Trend tracking', description: 'See where money grows or slips each month.' },
-  { icon: BellRing, title: 'Auto capture', description: 'Read bank alerts so you spend less time logging.' },
-  { icon: Wallet, title: 'Cleaner overview', description: 'Keep income, balance, and insights in one place.' },
-];
+const WelcomeStep = ({ navigation }: any) => (
+  <View style={styles.fullscreen}>
+    {/* Full Screen Background Image */}
+    <Image
+      source={require('../../assets/welcomeimg.jpg')}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    />
 
-const WelcomeStep = ({ navigation }: any) => {
-  return (
-    <Screen safeAreaStyle={styles.safeArea}>
+    <Screen safeAreaStyle={styles.safeArea} withContentWrapper={false}>
       <View style={styles.container}>
-        <View>
-          <LinearGradient colors={GRADIENTS.primary} style={styles.heroCard}>
-            <View style={styles.heroBadge}>
-              <Sparkles size={20} color={COLORS.primaryDark} />
-            </View>
-            <Text style={styles.heroEyebrow}>Smart setup</Text>
-            <Text style={styles.title}>Build a sharper money dashboard in under a minute</Text>
+        {/* Fill the top space so bottom card stays at bottom */}
+        <View style={styles.spacer} />
+
+        {/* Bottom Card (Full Width and attached to bottom) */}
+        <View style={styles.bottomCard}>
+          <View style={styles.textContainer}>
+            <Text style={styles.title}>Manage your daily{'\n'}life expenses</Text>
             <Text style={styles.subtitle}>
-              We keep the same calm theme, but organize your finance flow around better trends, cleaner cards, and faster insights.
+              Expense Tracker is a simple and efficient personal finance management app that allows you to track your daily expenses and income.
             </Text>
-          </LinearGradient>
+          </View>
 
-          <ElevatedCard style={styles.featuresCard}>
-            {FEATURES.map((feature, index) => {
-              const Icon = feature.icon;
-
-              return (
-                <View key={feature.title} style={[styles.featureRow, index === FEATURES.length - 1 && styles.featureRowLast]}>
-                  <View style={styles.featureIconWrap}>
-                    <Icon size={18} color={COLORS.primary} />
-                  </View>
-                  <View style={styles.featureCopy}>
-                    <Text style={styles.featureTitle}>{feature.title}</Text>
-                    <Text style={styles.featureDescription}>{feature.description}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </ElevatedCard>
-        </View>
-
-        <View>
-          <PrimaryButton label="Start setup" onPress={() => navigation.navigate('IncomeType')} />
-          <Text style={styles.footerNote}>Approximate setup time: 30 seconds</Text>
+          {/* CTA Button */}
+          <PrimaryButton
+            label="Get started"
+            onPress={() => navigation.navigate('IncomeType')}
+          />
         </View>
       </View>
     </Screen>
-  );
-};
+  </View>
+);
 
 const styles = StyleSheet.create({
+  fullscreen: {
+    flex: 1,
+    backgroundColor: '#FDF1D1', // Fallback background color matching the image
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.xl,
+    justifyContent: 'flex-end',
   },
-  heroCard: {
-    borderRadius: 30,
-    padding: SPACING.xl,
-  },
-  heroBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.white,
-    marginBottom: SPACING.xl,
-  },
-  heroEyebrow: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.78)',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  title: {
-    marginTop: SPACING.md,
-    fontSize: 30,
-    lineHeight: 38,
-    fontWeight: '800',
-    color: COLORS.white,
-  },
-  subtitle: {
-    marginTop: SPACING.md,
-    fontSize: 15,
-    lineHeight: 24,
-    color: 'rgba(255,255,255,0.82)',
-  },
-  featuresCard: {
-    marginTop: SPACING.lg,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  featureRowLast: {
-    borderBottomWidth: 0,
-  },
-  featureIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primarySurface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  featureCopy: {
+  spacer: {
     flex: 1,
   },
-  featureTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.textDark,
+  bottomCard: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    paddingHorizontal: 32,
+    paddingTop: 48,
+    paddingBottom: 48, // ample bottom padding
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 10,
+    width: '100%',
   },
-  featureDescription: {
-    marginTop: 2,
-    fontSize: 13,
-    lineHeight: 20,
-    color: COLORS.textMedium,
+  textContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
   },
-  footerNote: {
-    marginTop: SPACING.md,
+  title: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#1A1A1A',
     textAlign: 'center',
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.textLight,
+    lineHeight: 38,
+    marginBottom: 16,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#8A8A8A',
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 12,
   },
 });
 

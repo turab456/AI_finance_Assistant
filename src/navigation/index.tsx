@@ -54,30 +54,30 @@ const MainTabNavigator = () => (
       },
     }}
   >
-    <Tab.Screen 
-      name="Home" 
-      component={HomeScreen} 
+    <Tab.Screen
+      name="Home"
+      component={HomeScreen}
       options={{
         tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
       }}
     />
-    <Tab.Screen 
-      name="Transactions" 
-      component={TransactionsScreen} 
+    <Tab.Screen
+      name="Transactions"
+      component={TransactionsScreen}
       options={{
         tabBarIcon: ({ color, size }) => <List size={size} color={color} />,
       }}
     />
-    <Tab.Screen 
-      name="Insights" 
-      component={InsightsScreen} 
+    <Tab.Screen
+      name="Insights"
+      component={InsightsScreen}
       options={{
         tabBarIcon: ({ color, size }) => <PieChartIcon size={size} color={color} />,
       }}
     />
-    <Tab.Screen 
-      name="Profile" 
-      component={ProfileScreen} 
+    <Tab.Screen
+      name="Profile"
+      component={ProfileScreen}
       options={{
         tabBarIcon: ({ color, size }) => <UserIcon size={size} color={color} />,
       }}

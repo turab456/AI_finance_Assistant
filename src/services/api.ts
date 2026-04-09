@@ -3,7 +3,11 @@ import axios from 'axios';
 import { API_URL } from '@env';
 import storage from './storage';
 
-const API_BASE_URL = API_URL;
+// Forcefully bypassing the .env cache for debugging
+const API_BASE_URL = 'http://127.0.0.1:3000'; // Tunneling through USB via adb reverse
+
+console.log('--- API CONFIG INITIALIZED ---');
+console.log('Target API:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
